@@ -42,6 +42,7 @@ import {
   Background,
   BackgroundVariant,
   Controls,
+  ControlButton,
   Handle,
   MiniMap,
   Panel,
@@ -57,7 +58,7 @@ import {
   type OnNodeDrag,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Maximize, Minimize } from 'lucide-react';
 
 import { useTranslations } from 'next-intl';
 
@@ -287,6 +288,28 @@ function FlowCanvasInner() {
   const reactFlow = useReactFlow();
   const builderNodes = state.nodes;
   const entryNodeId = state.entry_node_id;
+
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      wrapperRef.current?.requestFullscreen().catch((err) => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
 
   // Side-panel state — which node's form is open. Canvas-only UI; the
   // list view's analogue is the per-card expanded set in
@@ -521,7 +544,7 @@ function FlowCanvasInner() {
 
   return (
     <>
-      <div className="h-full w-full overflow-hidden">
+      <div ref={wrapperRef} className="h-full w-full overflow-hidden bg-background">
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}
@@ -557,7 +580,11 @@ function FlowCanvasInner() {
           <Controls
             className="!border-border !bg-card [&_button]:!border-border [&_button]:!bg-card [&_button:hover]:!bg-muted [&_button_svg]:!fill-foreground !overflow-hidden !rounded-xl !border !shadow-[0_6px_20px_-8px_rgba(0,0,0,0.5)]"
             showInteractive={false}
-          />
+          >
+            <ControlButton onClick={toggleFullscreen} title={isFullscreen ? "Sair da Tela Cheia" : "Tela Cheia"}>
+              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+            </ControlButton>
+          </Controls>
           <MiniMap
             pannable
             zoomable
