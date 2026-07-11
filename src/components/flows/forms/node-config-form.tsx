@@ -1178,6 +1178,7 @@ function PipelineConfigFields({
   stageId: string | undefined;
   onChange: (patch: { pipeline_id?: string; stage_id?: string }) => void;
 }) {
+  const [loading, setLoading] = useState(true);
   const [pipelines, setPipelines] = useState<any[]>([]);
   const [stages, setStages] = useState<any[]>([]);
 
@@ -1191,11 +1192,31 @@ function PipelineConfigFields({
       ]);
       if (p) setPipelines(p);
       if (s) setStages(s);
+      setLoading(false);
     }
     load();
   }, []);
 
   const stageOptions = stages.filter((s) => s.pipeline_id === pipelineId);
+
+  if (loading) {
+    return (
+      <>
+        <div className="mb-4">
+          <label className="mb-1 block text-xs text-muted-foreground">Funil (Pipeline)</label>
+          <div className="bg-muted/50 border-border text-muted-foreground flex h-9 items-center rounded-md border px-3 text-xs">
+            Carregando...
+          </div>
+        </div>
+        <div className="mb-4">
+          <label className="mb-1 block text-xs text-muted-foreground">Etapa do Funil</label>
+          <div className="bg-muted/50 border-border text-muted-foreground flex h-9 items-center rounded-md border px-3 text-xs">
+            Carregando...
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
