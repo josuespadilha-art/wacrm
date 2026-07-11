@@ -1143,9 +1143,10 @@ async function handleReplyForActiveRun(
 
     if (!apptErr) {
       // Save raw ISO time + formatted date/time to vars
-      const d = selectedTime;
-      const dataStr = d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-      const horaStr = d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+      const tzOffset = 4;
+      const d = new Date(selectedTime.getTime() - tzOffset * 3600 * 1000);
+      const dataStr = `${d.getUTCDate().toString().padStart(2, '0')}/${(d.getUTCMonth() + 1).toString().padStart(2, '0')}/${d.getUTCFullYear()}`;
+      const horaStr = `${d.getUTCHours().toString().padStart(2, '0')}:${d.getUTCMinutes().toString().padStart(2, '0')}`;
 
       let newVars: Record<string, unknown> = {
         ...run.vars,
@@ -1191,6 +1192,14 @@ async function handleReplyForActiveRun(
           captured_key: cfg.var_key,
           captured_length: captured.length,
         });
+        
+        // Atualiza o contato no banco de dados se a variável for contact.name ou contact.phone
+        if (cfg.var_key === "contact.name") {
+          await db.from("contacts").update({ name: captured }).eq("id", run.contact_id);
+        } else if (cfg.var_key === "contact.phone") {
+          await db.from("contacts").update({ phone: captured }).eq("id", run.contact_id);
+        }
+        
         matched = cfg.next_node_key;
       }
     }
