@@ -1203,7 +1203,7 @@ function PipelineConfigFields({
         <label className="mb-1 block text-xs text-muted-foreground">Funil (Pipeline)</label>
         <Select
           value={pipelineId || undefined}
-          onValueChange={(val) => onChange({ pipeline_id: val, stage_id: "" })}
+          onValueChange={(val) => onChange({ pipeline_id: val ?? undefined, stage_id: "" })}
         >
           <SelectTrigger className="bg-muted text-xs">
             <SelectValue placeholder="Selecione um funil" />
@@ -1221,7 +1221,7 @@ function PipelineConfigFields({
         <label className="mb-1 block text-xs text-muted-foreground">Etapa do Funil</label>
         <Select
           value={stageId || undefined}
-          onValueChange={(val) => onChange({ stage_id: val })}
+          onValueChange={(val) => onChange({ stage_id: val ?? undefined })}
           disabled={!pipelineId || stageOptions.length === 0}
         >
           <SelectTrigger className="bg-muted text-xs">
