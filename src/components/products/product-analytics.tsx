@@ -155,9 +155,9 @@ export function ProductAnalytics() {
         metric.salesCount += 1;
       });
 
-      // Sort by total value and get top 10
+      // Sort by total quantity and get top 10
       const sortedProducts = Array.from(productMap.values())
-        .sort((a, b) => b.totalValue - a.totalValue)
+        .sort((a, b) => b.totalQuantity - a.totalQuantity)
         .slice(0, 10);
 
       setTopProducts(sortedProducts);
@@ -183,7 +183,11 @@ export function ProductAnalytics() {
       });
 
       const sortedChartData = Array.from(dailyData.values()).sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+        (a, b) => {
+          const [da, ma, ya] = a.date.split('/');
+          const [db, mb, yb] = b.date.split('/');
+          return new Date(`${ya}-${ma}-${da}`).getTime() - new Date(`${yb}-${mb}-${db}`).getTime();
+        }
       );
 
       setChartData(sortedChartData);
@@ -263,7 +267,7 @@ export function ProductAnalytics() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  R$ {totalRevenue.toFixed(2)}
+                  R$ {totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Total no período
@@ -291,7 +295,7 @@ export function ProductAnalytics() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  R$ {totalSales > 0 ? (totalRevenue / totalSales).toFixed(2) : '0.00'}
+                  R$ {totalSales > 0 ? (totalRevenue / totalSales).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00'}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Valor médio por venda
@@ -394,10 +398,10 @@ export function ProductAnalytics() {
                           {product.sku || '-'}
                         </td>
                         <td className="py-3 text-right">
-                          {product.totalQuantity.toFixed(2)}
+                          {product.totalQuantity.toLocaleString('pt-BR')}
                         </td>
                         <td className="py-3 text-right font-semibold">
-                          R$ {product.totalValue.toFixed(2)}
+                          R$ {product.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                         <td className="py-3 text-right text-muted-foreground">
                           {product.salesCount}

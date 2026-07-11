@@ -78,10 +78,11 @@ export function PipelineAnalytics({ stages, deals }: PipelineAnalyticsProps) {
     };
     const wonThisMonth = deals.filter(
       (d) => d.status === "won" && thisMonth(d),
-    ).length;
+    ).reduce((sum, d) => sum + Number(d.value || 0), 0);
+    
     const lostThisMonth = deals.filter(
       (d) => d.status === "lost" && thisMonth(d),
-    ).length;
+    ).reduce((sum, d) => sum + Number(d.value || 0), 0);
 
     return {
       totalCount,
@@ -127,14 +128,14 @@ export function PipelineAnalytics({ stages, deals }: PipelineAnalyticsProps) {
         <Metric
           icon={<Trophy className="h-4 w-4 text-primary" />}
           label={t("wonThisMonth")}
-          value={String(stats.wonThisMonth)}
+          value={formatCurrency(stats.wonThisMonth, defaultCurrency)}
           tooltip={t("wonThisMonthTooltip")}
           t={t}
         />
         <Metric
           icon={<XCircle className="h-4 w-4 text-red-400" />}
           label={t("lostThisMonth")}
-          value={String(stats.lostThisMonth)}
+          value={formatCurrency(stats.lostThisMonth, defaultCurrency)}
           tooltip={t("lostThisMonthTooltip")}
           t={t}
         />

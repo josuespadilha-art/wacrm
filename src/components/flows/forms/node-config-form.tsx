@@ -251,6 +251,7 @@ export function NodeConfigForm({
 interface SendButtonsCfg {
   text?: string;
   footer_text?: string;
+  var_key?: string;
   buttons?: Array<{ reply_id: string; title: string; next_node_key: string }>;
 }
 
@@ -305,6 +306,21 @@ function SendButtonsForm({
         value={cfg.footer_text ?? ""}
         onChange={(v) => onUpdateConfig({ footer_text: v })}
       />
+      <div>
+        <label className="mb-1 block text-xs text-muted-foreground">
+          Salvar resposta na variável (opcional)
+        </label>
+        <Input
+          value={cfg.var_key ?? ""}
+          onChange={(e) =>
+            onUpdateConfig({
+              var_key: e.target.value.replace(/[^a-zA-Z0-9_]/g, ""),
+            })
+          }
+          placeholder="Ex: profissional_escolhido"
+          className="bg-muted font-mono mb-4"
+        />
+      </div>
       <div>
         <div className="mb-2 flex items-center justify-between">
           <label className="text-xs text-muted-foreground">
@@ -383,6 +399,7 @@ interface SendListCfg {
   text?: string;
   button_label?: string;
   footer_text?: string;
+  var_key?: string;
   sections?: Array<{
     title?: string;
     rows: Array<{
@@ -501,6 +518,21 @@ function SendListForm({
           label={t("footerText")}
           value={cfg.footer_text ?? ""}
           onChange={(v) => onUpdateConfig({ footer_text: v })}
+        />
+      </div>
+      <div className="mt-2">
+        <label className="mb-1 block text-xs text-muted-foreground">
+          Salvar resposta na variável (opcional)
+        </label>
+        <Input
+          value={cfg.var_key ?? ""}
+          onChange={(e) =>
+            onUpdateConfig({
+              var_key: e.target.value.replace(/[^a-zA-Z0-9_]/g, ""),
+            })
+          }
+          placeholder="Ex: servico_escolhido"
+          className="bg-muted font-mono"
         />
       </div>
 

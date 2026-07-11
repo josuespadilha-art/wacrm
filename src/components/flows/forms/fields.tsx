@@ -45,11 +45,13 @@ export function TextRow({
   value,
   onChange,
   rows = 1,
+  availableVars = ["contact.name", "contact.phone"],
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   rows?: number;
+  availableVars?: string[];
 }) {
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
@@ -80,13 +82,12 @@ export function TextRow({
             <Braces className="h-3 w-3" />
             Variáveis
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48 text-xs">
-            <DropdownMenuItem onClick={() => insertVar("{{contact.name}}")}>
-              Nome do Cliente
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => insertVar("{{contact.phone}}")}>
-              Telefone
-            </DropdownMenuItem>
+          <DropdownMenuContent align="end" className="w-48 max-h-[300px] overflow-y-auto text-xs">
+            {availableVars.map((v) => (
+              <DropdownMenuItem key={v} onClick={() => insertVar(`{{${v}}}`)}>
+                {v === "contact.name" ? "Nome do Cliente" : v === "contact.phone" ? "Telefone" : v}
+              </DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

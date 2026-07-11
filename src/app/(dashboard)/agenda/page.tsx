@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { format, addDays, subDays, startOfWeek, addWeeks, subWeeks, parseISO, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, User, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, User, Plus, Trash2, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,14 @@ import {
   SheetFooter,
   SheetClose,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -46,6 +54,14 @@ export default function AgendaPage() {
   });
   const [saving, setSaving] = useState(false);
 
+  // Detalhes do Agendamento (Visualizar, Excluir, Remarcar)
+  const [selectedAppt, setSelectedAppt] = useState<any>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [rescheduleData, setRescheduleData] = useState({ date: "", time: "", employeeId: "" });
+  const [rescheduling, setRescheduling] = useState(false);
+
   // Carregar Funcionários e Agendamentos
   useEffect(() => {
     if (!account?.id) return;
@@ -54,16 +70,31 @@ export default function AgendaPage() {
       setLoading(true);
       
       // Busca funcionários
+      const { data: { session } } = await supabase.auth.getSession();
+      
       const { data: members } = await supabase
-        .from("account_members")
-        .select("id, profiles(display_name)")
+        .from("profiles")
+        .select("user_id, full_name, account_role")
         .eq("account_id", account!.id);
         
       if (members) {
-        setEmployees(members.map(m => ({
-          id: m.id,
-          name: (m.profiles as any)?.display_name || "Membro"
+        const currentUserProfile = members.find(m => m.user_id === session?.user?.id);
+        const isAgent = currentUserProfile?.account_role === "agent";
+
+        const filteredMembers = isAgent 
+          ? members.filter(m => m.user_id === session?.user?.id) 
+          : members;
+
+        setEmployees(filteredMembers.map(m => ({
+          id: m.user_id,
+          name: m.full_name || "Membro",
+          role: m.account_role
         })));
+        
+        // Se for agent, fixa o filtro no id do próprio agent
+        if (isAgent && session?.user?.id) {
+          setSelectedEmployee(session.user.id);
+        }
       }
 
       // Busca agendamentos da semana/dia visível
@@ -72,7 +103,7 @@ export default function AgendaPage() {
       
       const { data: appts } = await supabase
         .from("appointments")
-        .select("*")
+        .select("*, contacts(name, phone)")
         .eq("account_id", account!.id)
         .gte("start_time", start.toISOString())
         .lte("start_time", addDays(end, 1).toISOString());
@@ -100,7 +131,7 @@ export default function AgendaPage() {
 
   const handleToday = () => setCurrentDate(new Date());
 
-  // Salvar Agendamento
+  // Salvar Novo Agendamento
   const handleSaveAppointment = async () => {
     if (!account?.id || !newAppt.clientName || !newAppt.employeeId || !newAppt.date || !newAppt.time) {
       alert("Preencha todos os campos obrigatórios");
@@ -109,18 +140,14 @@ export default function AgendaPage() {
 
     setSaving(true);
     try {
-      // Como não criamos um UI para buscar 'contacts' ainda, vamos criar um contato genérico ou usar notes
-      // Em produção, isso seria ligado à tabela `contacts`
-      
-      // Cria a data de início e fim
-      const startTime = new Date(`${newAppt.date}T${newAppt.time}:00-03:00`); // Fuso BR simples
-      const endTime = addHours(startTime, 1); // Mock: 1 hora de duração padrão
+      const startTime = new Date(`${newAppt.date}T${newAppt.time}:00-03:00`); 
+      const endTime = addHours(startTime, 1);
       
       const payload = {
         account_id: account.id,
         assignee_id: newAppt.employeeId,
-        contact_id: null, // Idealmente teríamos a busca de contatos aqui
-        notes: `Cliente: ${newAppt.clientName} | Serviço: ${newAppt.service}`,
+        contact_id: null, 
+        notes: `[Agendado Manualmente] Cliente: ${newAppt.clientName} | Serviço: ${newAppt.service}`,
         start_time: startTime.toISOString(),
         end_time: endTime.toISOString(),
         status: 'scheduled'
@@ -129,7 +156,7 @@ export default function AgendaPage() {
       const { data, error } = await supabase
         .from('appointments')
         .insert(payload)
-        .select()
+        .select("*, contacts(name, phone)")
         .single();
 
       if (error) throw error;
@@ -144,6 +171,67 @@ export default function AgendaPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Excluir Agendamento
+  const handleDeleteAppointment = async () => {
+    if (!selectedAppt || !confirm("Tem certeza que deseja excluir este agendamento?")) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from('appointments').delete().eq('id', selectedAppt.id);
+      if (error) throw error;
+      setAppointments(prev => prev.filter(a => a.id !== selectedAppt.id));
+      setIsDetailsOpen(false);
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao excluir agendamento.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Remarcar Agendamento
+  const handleReschedule = async () => {
+    if (!selectedAppt || !rescheduleData.date || !rescheduleData.time || !rescheduleData.employeeId) return;
+    setRescheduling(true);
+    try {
+      const startTime = new Date(`${rescheduleData.date}T${rescheduleData.time}:00-03:00`); 
+      const endTime = addHours(startTime, 1);
+
+      const { data, error } = await supabase
+        .from('appointments')
+        .update({
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          assignee_id: rescheduleData.employeeId
+        })
+        .eq('id', selectedAppt.id)
+        .select("*, contacts(name, phone)")
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setAppointments(prev => prev.map(a => a.id === data.id ? data : a));
+      }
+      setIsRescheduling(false);
+      setIsDetailsOpen(false);
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao remarcar agendamento.");
+    } finally {
+      setRescheduling(false);
+    }
+  };
+
+  const openApptDetails = (appt: any) => {
+    setSelectedAppt(appt);
+    setRescheduleData({
+      date: format(parseISO(appt.start_time), "yyyy-MM-dd"),
+      time: format(parseISO(appt.start_time), "HH:mm"),
+      employeeId: appt.assignee_id || ""
+    });
+    setIsRescheduling(false);
+    setIsDetailsOpen(true);
   };
 
   // Week Days calculation
@@ -316,7 +404,7 @@ export default function AgendaPage() {
               {/* LINHAS DE HORÁRIOS */}
               <div className="flex-1 overflow-y-auto relative">
                 {HOURS.map((hour) => (
-                  <div key={hour} className="flex border-b border-border last:border-b-0 min-h-[60px] group">
+                  <div key={hour} className="flex border-b border-border last:border-b-0 min-h-[90px] group">
                     <div className="w-[80px] p-2 text-center text-xs font-medium text-muted-foreground border-r border-border bg-muted/20 shrink-0">
                       {hour.toString().padStart(2, '0')}:00
                     </div>
@@ -324,11 +412,11 @@ export default function AgendaPage() {
                     {view === "day" ? (
                       employees.map((emp) => {
                         const appointment = appointments.find(a => 
-                          a.assignee_id === emp.id && 
+                          (a.assignee_id === emp.id || (a.assignee_id === null && emp.role === "owner")) && 
                           isSameDay(parseISO(a.start_time), currentDate) &&
                           parseISO(a.start_time).getHours() === hour
                         );
-                        return <Cell key={emp.id} appointment={appointment} />;
+                        return <Cell key={emp.id} appointment={appointment} onClick={openApptDetails} />;
                       })
                     ) : (
                       weekDays.map((day, idx) => {
@@ -341,12 +429,7 @@ export default function AgendaPage() {
                         return (
                           <div key={idx} className="flex-1 border-r border-border last:border-r-0 p-1 hover:bg-muted/30 transition-colors relative flex gap-1">
                             {dayAppointments.map(app => (
-                              <div key={app.id} className="flex-1 rounded-md bg-primary/10 border border-primary/20 p-1 shadow-sm overflow-hidden flex flex-col justify-center min-w-[50px]">
-                                <span className="text-[10px] font-bold text-primary truncate">{format(parseISO(app.start_time), "HH:mm")}</span>
-                                <span className="text-[9px] text-primary/80 truncate" title={app.notes}>
-                                  {app.notes || "Ocupado"}
-                                </span>
-                              </div>
+                              <CompactCell key={app.id} appointment={app} onClick={openApptDetails} />
                             ))}
                           </div>
                         );
@@ -359,22 +442,155 @@ export default function AgendaPage() {
           )}
         </div>
       </div>
+
+      {/* DIALOG DE DETALHES DO AGENDAMENTO */}
+      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Agendamento</DialogTitle>
+            <DialogDescription>
+              Visualize os detalhes deste horário.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedAppt && !isRescheduling && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-semibold col-span-1 text-right text-sm">Cliente:</span>
+                <span className="col-span-3 text-sm">
+                  {selectedAppt.contacts?.name || 
+                    (selectedAppt.notes.includes("Cliente:") ? selectedAppt.notes.split("Cliente:")[1].split("|")[0].trim() : "Cliente Desconhecido")}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-semibold col-span-1 text-right text-sm">Profissional:</span>
+                <span className="col-span-3 text-sm">
+                  {employees.find(e => e.id === selectedAppt.assignee_id)?.name || "Nenhum selecionado"}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <span className="font-semibold col-span-1 text-right text-sm">Horário:</span>
+                <span className="col-span-3 text-sm text-primary font-medium">
+                  {format(parseISO(selectedAppt.start_time), "dd/MM/yyyy 'às' HH:mm")}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <span className="font-semibold col-span-1 text-right text-sm">Notas:</span>
+                <span className="col-span-3 text-sm text-muted-foreground whitespace-pre-wrap">
+                  {selectedAppt.notes || "Nenhuma nota inserida."}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {selectedAppt && isRescheduling && (
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="resched-employee">Profissional</Label>
+                <select
+                  id="resched-employee"
+                  value={rescheduleData.employeeId}
+                  onChange={e => setRescheduleData({...rescheduleData, employeeId: e.target.value})}
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                >
+                  <option value="" disabled>Selecione o profissional</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>{emp.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="resched-date">Nova Data</Label>
+                  <Input 
+                    id="resched-date" 
+                    type="date" 
+                    value={rescheduleData.date}
+                    onChange={e => setRescheduleData({...rescheduleData, date: e.target.value})}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="resched-time">Novo Horário</Label>
+                  <Input 
+                    id="resched-time" 
+                    type="time" 
+                    value={rescheduleData.time}
+                    onChange={e => setRescheduleData({...rescheduleData, time: e.target.value})}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 justify-between w-full sm:justify-between items-center">
+            {isRescheduling ? (
+              <>
+                <Button variant="ghost" onClick={() => setIsRescheduling(false)} disabled={rescheduling}>Voltar</Button>
+                <Button onClick={handleReschedule} disabled={rescheduling}>
+                  {rescheduling ? "Salvando..." : "Confirmar Novo Horário"}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="destructive" onClick={handleDeleteAppointment} disabled={deleting}>
+                  <Trash2 className="h-4 w-4 mr-2" /> Excluir
+                </Button>
+                <Button variant="secondary" onClick={() => setIsRescheduling(true)}>
+                  <CalendarClock className="h-4 w-4 mr-2" /> Remarcar
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function Cell({ appointment }: { appointment: any }) {
+function Cell({ appointment, onClick }: { appointment: any, onClick: (appt: any) => void }) {
+  if (!appointment) return <div className="flex-1 border-r border-border last:border-r-0 p-1 hover:bg-muted/30 transition-colors relative" />;
+
+  const contactName = appointment.contacts?.name || (appointment.notes?.includes("Cliente:") ? appointment.notes.split("Cliente:")[1].split("|")[0].trim() : "Cliente");
+  const isManual = appointment.notes?.includes("[Agendado Manualmente]");
+  const isWhatsApp = appointment.notes?.includes("[Agendado via WhatsApp]") || appointment.notes?.toLowerCase().includes("whatsapp");
+
   return (
-    <div className="flex-1 border-r border-border last:border-r-0 p-1 hover:bg-muted/30 transition-colors relative">
-      {appointment && (
-        <div className="absolute inset-x-2 top-1 bottom-1 rounded-md bg-primary/10 border border-primary/20 p-2 shadow-sm overflow-hidden flex flex-col justify-center">
+    <div 
+       className="flex-1 border-r border-border last:border-r-0 p-1 hover:bg-muted/30 transition-colors relative cursor-pointer"
+       onClick={() => onClick(appointment)}
+    >
+      <div className="absolute inset-x-1 top-1 bottom-1 rounded-md bg-primary/10 border border-primary/20 p-2 shadow-sm overflow-hidden flex flex-col justify-start">
+        <div className="flex items-center gap-2 mb-1">
           <span className="text-xs font-bold text-primary">{format(parseISO(appointment.start_time), "HH:mm")}</span>
-          <span className="text-[11px] text-primary/70 line-clamp-2" title={appointment.notes}>{appointment.notes || "Ocupado"}</span>
+          {isWhatsApp && <span className="text-[9px] bg-green-500/20 text-green-700 px-1 rounded">WhatsApp</span>}
+          {isManual && <span className="text-[9px] bg-blue-500/20 text-blue-700 px-1 rounded">Manual</span>}
         </div>
-      )}
+        <span className="text-[11px] font-semibold text-foreground truncate">{contactName}</span>
+        <span className="text-[10px] text-primary/70 line-clamp-1" title={appointment.notes}>
+          {appointment.notes?.replace(/\[.*?\]/, "").replace("Agendado via WhatsApp", "").trim() || "Ocupado"}
+        </span>
+      </div>
     </div>
   );
 }
+
+function CompactCell({ appointment, onClick }: { appointment: any, onClick: (appt: any) => void }) {
+  const contactName = appointment.contacts?.name || (appointment.notes?.includes("Cliente:") ? appointment.notes.split("Cliente:")[1].split("|")[0].trim() : "Cliente");
+  
+  return (
+    <div 
+      className="flex-1 rounded-md bg-primary/10 border border-primary/20 p-1 shadow-sm overflow-hidden flex flex-col justify-center min-w-[50px] cursor-pointer hover:bg-primary/20 transition-colors"
+      onClick={() => onClick(appointment)}
+    >
+      <span className="text-[10px] font-bold text-primary truncate">{format(parseISO(appointment.start_time), "HH:mm")}</span>
+      <span className="text-[9px] font-semibold text-foreground truncate">{contactName}</span>
+      <span className="text-[8px] text-primary/80 truncate" title={appointment.notes}>
+        {appointment.notes?.replace(/\[.*?\]/, "").replace("Agendado via WhatsApp", "").replace(/[()]/g, "").trim() || "Ocupado"}
+      </span>
+    </div>
+  );
+}
+
 // Helper utils 
 function addHours(date: Date, amount: number): Date {
   const result = new Date(date);

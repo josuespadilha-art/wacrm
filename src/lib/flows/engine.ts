@@ -68,24 +68,31 @@ import {
  * Given a node + the customer's reply_id, return the next_node_key
  * to advance to, or `null` if no option matches.
  */
-export function matchReplyId(
+export function findReplyOption(
   node: { node_type: string; config: Record<string, unknown> },
   reply_id: string,
-): string | null {
+): { next_node_key: string; title: string } | null {
   if (node.node_type === "send_buttons") {
     const cfg = node.config as unknown as SendButtonsNodeConfig;
     const hit = cfg.buttons?.find((b) => b.reply_id === reply_id);
-    return hit?.next_node_key ?? null;
+    return hit ? { next_node_key: hit.next_node_key, title: hit.title } : null;
   }
   if (node.node_type === "send_list") {
     const cfg = node.config as unknown as SendListNodeConfig;
     for (const section of cfg.sections ?? []) {
       const hit = section.rows?.find((r) => r.reply_id === reply_id);
-      if (hit) return hit.next_node_key;
+      if (hit) return { next_node_key: hit.next_node_key, title: hit.title };
     }
     return null;
   }
   return null;
+}
+
+export function matchReplyId(
+  node: { node_type: string; config: Record<string, unknown> },
+  reply_id: string,
+): string | null {
+  return findReplyOption(node, reply_id)?.next_node_key ?? null;
 }
 
 /**
@@ -431,7 +438,6 @@ async function sendListAndSuspend(
     .eq("id", run.id);
   return { outcome: "advanced", node_key: node.node_key };
 }
-
 async function sendAppointmentListAndSuspend(
   db: AdminClient,
   run: FlowRunRow,
@@ -439,30 +445,71 @@ async function sendAppointmentListAndSuspend(
 ): Promise<{ outcome: "advanced"; node_key: string }> {
   const cfg = node.config as unknown as AppointmentNodeConfig;
   
-  // Mock basico de próximos dias para demonstração (Fase 4 simplificada)
-  const now = new Date();
-  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const nextWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+  // Buscar horários de funcionamento do salão
+  const { data: opHours } = await db
+    .from("operating_hours")
+    .select("*")
+    .eq("account_id", run.account_id);
+
+  // Buscar agendamentos já marcados para evitar double booking (simples)
+  const { data: appts } = await db
+    .from("appointments")
+    .select("start_time, end_time")
+    .eq("account_id", run.account_id)
+    .in("status", ["scheduled"]);
+
+  const nowMs = Date.now();
+  // Fuso horário de São Paulo (UTC-3)
+  const brMs = nowMs - (3 * 3600 * 1000);
+  const brNow = new Date(brMs);
+  const pad = (n: number) => n.toString().padStart(2, '0');
   
-  const formatDate = (d: Date) => d.toISOString().split('T')[0];
+  const slots: Array<{id: string, title: string, description: string}> = [];
   
-  const slots = [
-    {
-      id: `${formatDate(tomorrow)}T09:00:00.000Z`,
-      title: "Amanhã - 09:00",
-      description: "Disponível"
-    },
-    {
-      id: `${formatDate(tomorrow)}T14:00:00.000Z`,
-      title: "Amanhã - 14:00",
-      description: "Disponível"
-    },
-    {
-      id: `${formatDate(nextWeek)}T10:00:00.000Z`,
-      title: "Depois de amanhã",
-      description: "10:00 - Disponível"
+  // Gerar slots para os próximos 7 dias
+  for (let i = 0; i < 7; i++) {
+    const brMidnight = new Date(Date.UTC(brNow.getUTCFullYear(), brNow.getUTCMonth(), brNow.getUTCDate() + i));
+    const dayOfWeek = brMidnight.getUTCDay(); // 0 = Dom, 1 = Seg... (no BRT)
+    
+    const dayConfig = opHours?.find((h: any) => h.day_of_week === dayOfWeek);
+    if (!dayConfig || dayConfig.is_closed) continue;
+    
+    const [openH, openM] = dayConfig.open_time.split(':').map(Number);
+    const [closeH, closeM] = dayConfig.close_time.split(':').map(Number);
+    
+    let currentSlot = new Date(Date.UTC(brMidnight.getUTCFullYear(), brMidnight.getUTCMonth(), brMidnight.getUTCDate(), openH + 3, openM));
+    const endTime = new Date(Date.UTC(brMidnight.getUTCFullYear(), brMidnight.getUTCMonth(), brMidnight.getUTCDate(), closeH + 3, closeM));
+
+    while (currentSlot.getTime() + 30 * 60 * 1000 <= endTime.getTime()) {
+      if (currentSlot.getTime() > nowMs) {
+        // Verificar se tem overlap com algum agendamento existente
+        const isOverlap = appts?.some((appt: any) => {
+          const apptStart = new Date(appt.start_time).getTime();
+          const apptEnd = new Date(appt.end_time).getTime();
+          return currentSlot.getTime() < apptEnd && (currentSlot.getTime() + 30 * 60 * 1000) > apptStart;
+        });
+
+        if (!isOverlap && slots.length < 10) {
+          const d = new Date(currentSlot.getTime() - 3 * 3600 * 1000);
+          slots.push({
+            id: currentSlot.toISOString(),
+            title: `${pad(d.getUTCDate())}/${pad(d.getUTCMonth()+1)} - ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`,
+            description: "Disponível"
+          });
+        }
+      }
+      currentSlot = new Date(currentSlot.getTime() + 30 * 60 * 1000); // 30 mins
     }
-  ];
+  }
+
+  // Fallback caso não haja horários
+  if (slots.length === 0) {
+    slots.push({
+      id: "no_slots",
+      title: "Sem horários",
+      description: "Tente novamente depois"
+    });
+  }
 
   const { whatsapp_message_id } = await engineSendInteractiveList({
     accountId: run.account_id,
@@ -483,8 +530,6 @@ async function sendAppointmentListAndSuspend(
     node_type: "appointment",
     whatsapp_message_id,
   });
-  
-  return { outcome: "advanced", node_key: node.node_key };
 
   const { data: msg } = await db
     .from("messages")
@@ -587,7 +632,7 @@ async function evaluateConditionNode(
  */
 function interpolateVars(template: string, vars: Record<string, unknown>): string {
   if (!template) return "";
-  return template.replace(/\{\{vars\.([a-zA-Z0-9_]+)\}\}/g, (_, key) => {
+  return template.replace(/\{\{(?:vars\.)?([a-zA-Z0-9_]+)\}\}/g, (_, key) => {
     const v = vars[key];
     return v === undefined || v === null ? "" : String(v);
   });
@@ -1016,7 +1061,29 @@ async function handleReplyForActiveRun(
     (currentNode.node_type === "send_buttons" ||
       currentNode.node_type === "send_list")
   ) {
-    matched = matchReplyId(currentNode, message.reply_id);
+    const optionMatch = findReplyOption(currentNode, message.reply_id);
+    if (optionMatch) {
+      matched = optionMatch.next_node_key;
+      const cfg = currentNode.config as unknown as { var_key?: string };
+      if (cfg.var_key) {
+        const newVars = { ...run.vars, [cfg.var_key]: optionMatch.title };
+        const { error: capErr } = await db
+          .from("flow_runs")
+          .update({
+            vars: newVars,
+            reprompt_count: 0,
+          })
+          .eq("id", run.id);
+        if (!capErr) {
+          run.vars = newVars;
+          run.reprompt_count = 0;
+          await logEvent(db, run.id, "node_entered", currentNode.node_key, {
+            captured_key: cfg.var_key,
+            captured_length: optionMatch.title.length,
+          });
+        }
+      }
+    }
   } else if (
     message.kind === "interactive_reply" &&
     currentNode.node_type === "appointment"
@@ -1026,24 +1093,57 @@ async function handleReplyForActiveRun(
     const selectedTime = new Date(selectedTimeStr);
     
     // Save to DB
+    let interpolatedService = cfg.service ? interpolateVars(cfg.service, run.vars) : 'Serviço';
+    interpolatedService = interpolatedService.replace(/\{\{[^}]+\}\}/g, '').replace(/\s+/g, ' ').trim();
+    
+    // Auto-atribuição Inteligente (Match por Nome)
+    let assigneeId = cfg.employee_id || null;
+    if (!assigneeId && run.vars.profissional_escolhido) {
+      const { data: members } = await db
+        .from("profiles")
+        .select("user_id, full_name")
+        .eq("account_id", run.account_id);
+        
+      if (members) {
+        const profName = String(run.vars.profissional_escolhido).toLowerCase();
+        const matchedMember = members.find(m => 
+          m.full_name?.toLowerCase().includes(profName)
+        );
+        if (matchedMember) {
+          assigneeId = matchedMember.user_id;
+        }
+      }
+    }
+    
     const { error: apptErr } = await db.from("appointments").insert({
       account_id: run.account_id,
       contact_id: run.contact_id!,
-      assignee_id: cfg.employee_id || null,
+      assignee_id: assigneeId,
       start_time: selectedTimeStr,
       end_time: new Date(selectedTime.getTime() + 60 * 60 * 1000).toISOString(), // 1 hora
       status: 'scheduled',
-      notes: `Agendado via WhatsApp (${cfg.service || 'Serviço'})`
+      notes: `[Agendado via WhatsApp] ${interpolatedService}`
     });
 
     if (!apptErr) {
-      if (cfg.variable_name) {
-        const newVars = { ...run.vars, [cfg.variable_name]: selectedTimeStr };
-        run.vars = newVars;
-        await db.from("flow_runs").update({ vars: newVars, reprompt_count: 0 }).eq("id", run.id);
-      } else {
-        await db.from("flow_runs").update({ reprompt_count: 0 }).eq("id", run.id);
+      // Save raw ISO time + formatted date/time to vars
+      const d = selectedTime;
+      const dataStr = d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+      const horaStr = d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+
+      let newVars: Record<string, unknown> = {
+        ...run.vars,
+        agendamento_data: dataStr,
+        agendamento_hora: horaStr,
+      };
+
+      if (cfg.variable_name && cfg.variable_name !== 'agendamento_data' && cfg.variable_name !== 'agendamento_hora') {
+        newVars[cfg.variable_name] = selectedTimeStr;
       }
+
+      run.vars = newVars;
+      await db.from("flow_runs").update({ vars: newVars, reprompt_count: 0 }).eq("id", run.id);
+
       await logEvent(db, run.id, "node_entered", currentNode.node_key, {
         appointment_time: selectedTimeStr
       });
