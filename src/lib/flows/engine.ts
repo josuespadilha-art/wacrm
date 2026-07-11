@@ -920,12 +920,13 @@ async function advanceFromNodeKey(
           } else {
             const { data: acct } = await db
               .from("accounts")
-              .select("default_currency")
+              .select("default_currency, owner_user_id")
               .eq("id", run.account_id)
               .maybeSingle();
 
-            await db.from("deals").insert({
+            const { error: insertErr } = await db.from("deals").insert({
               account_id: run.account_id,
+              user_id: acct?.owner_user_id,
               contact_id: run.contact_id,
               pipeline_id: cfg.pipeline_id,
               stage_id: cfg.stage_id,
@@ -934,6 +935,13 @@ async function advanceFromNodeKey(
               currency: acct?.default_currency ?? "BRL",
               status: "open",
             });
+            
+            if (insertErr) {
+              await logEvent(db, run.id, "error", node.node_key, {
+                reason: "change_pipeline_stage_failed",
+                detail: "Insert failed: " + insertErr.message,
+              });
+            }
           }
         } catch (err) {
           await logEvent(db, run.id, "error", node.node_key, {
