@@ -59,6 +59,16 @@ export function deriveCanvasEdges(nodes: BuilderNode[]): CanvasEdge[] {
             sourceHandle: "next",
           });
         }
+        const timeoutNext = (cfg as { timeout_node_key?: string }).timeout_node_key;
+        if (timeoutNext && knownKeys.has(timeoutNext)) {
+          edges.push({
+            id: `${node.node_key}--timeout--${timeoutNext}`,
+            source: node.node_key,
+            target: timeoutNext,
+            sourceHandle: "timeout",
+            label: "timeout",
+          });
+        }
         break;
       }
 
@@ -107,6 +117,16 @@ export function deriveCanvasEdges(nodes: BuilderNode[]): CanvasEdge[] {
             label: title ?? replyId,
           });
         }
+        const timeoutNext = (cfg as { timeout_node_key?: string }).timeout_node_key;
+        if (timeoutNext && knownKeys.has(timeoutNext)) {
+          edges.push({
+            id: `${node.node_key}--timeout--${timeoutNext}`,
+            source: node.node_key,
+            target: timeoutNext,
+            sourceHandle: "timeout",
+            label: "timeout",
+          });
+        }
         break;
       }
 
@@ -135,6 +155,16 @@ export function deriveCanvasEdges(nodes: BuilderNode[]): CanvasEdge[] {
               label: title ?? replyId,
             });
           }
+        }
+        const timeoutNext = (cfg as { timeout_node_key?: string }).timeout_node_key;
+        if (timeoutNext && knownKeys.has(timeoutNext)) {
+          edges.push({
+            id: `${node.node_key}--timeout--${timeoutNext}`,
+            source: node.node_key,
+            target: timeoutNext,
+            sourceHandle: "timeout",
+            label: "timeout",
+          });
         }
         break;
       }
@@ -178,10 +208,14 @@ export function outgoingSlots(node: BuilderNode): OutgoingSlot[] {
     case "start":
     case "send_message":
     case "send_media":
-    case "collect_input":
     case "set_tag":
-    case "appointment":
       return [{ id: "next", label: "Next" }];
+    case "collect_input":
+    case "appointment":
+      return [
+        { id: "next", label: "Next" },
+        { id: "timeout", label: "Sem resposta" },
+      ];
 
     case "condition":
       return [
@@ -193,7 +227,7 @@ export function outgoingSlots(node: BuilderNode): OutgoingSlot[] {
       const buttons = Array.isArray((cfg as { buttons?: unknown }).buttons)
         ? ((cfg as { buttons: Array<Record<string, unknown>> }).buttons)
         : [];
-      return buttons
+      const slots: OutgoingSlot[] = buttons
         .filter((b) => typeof b.reply_id === "string" && b.reply_id)
         .map((b) => {
           const replyId = b.reply_id as string;
@@ -203,6 +237,8 @@ export function outgoingSlots(node: BuilderNode): OutgoingSlot[] {
             label: title ?? replyId,
           };
         });
+      slots.push({ id: "timeout", label: "Sem resposta" });
+      return slots;
     }
 
     case "send_list": {
@@ -225,6 +261,7 @@ export function outgoingSlots(node: BuilderNode): OutgoingSlot[] {
           });
         }
       }
+      slots.push({ id: "timeout", label: "Sem resposta" });
       return slots;
     }
 
@@ -253,10 +290,13 @@ export function applyEdgeConnection(
     case "start":
     case "send_message":
     case "send_media":
-    case "collect_input":
     case "set_tag":
+      if (sourceHandle === "next") return { next_node_key: targetKey };
+      return null;
+    case "collect_input":
     case "appointment":
       if (sourceHandle === "next") return { next_node_key: targetKey };
+      if (sourceHandle === "timeout") return { timeout_node_key: targetKey };
       return null;
 
     case "condition":
@@ -265,6 +305,7 @@ export function applyEdgeConnection(
       return null;
 
     case "send_buttons": {
+      if (sourceHandle === "timeout") return { timeout_node_key: targetKey };
       if (!sourceHandle.startsWith("button:")) return null;
       const replyId = sourceHandle.slice("button:".length);
       const buttons = Array.isArray(
@@ -285,6 +326,7 @@ export function applyEdgeConnection(
     }
 
     case "send_list": {
+      if (sourceHandle === "timeout") return { timeout_node_key: targetKey };
       if (!sourceHandle.startsWith("row:")) return null;
       const replyId = sourceHandle.slice("row:".length);
       const sections = Array.isArray(
@@ -348,12 +390,22 @@ function patchedConfigWithoutKey(
     case "start":
     case "send_message":
     case "send_media":
-    case "collect_input":
-    case "set_tag":
-    case "appointment": {
+    case "set_tag": {
       const next = (cfg as { next_node_key?: string }).next_node_key;
       if (next !== deletedKey) return null;
       return { ...cfg, next_node_key: "" };
+    }
+    case "collect_input":
+    case "appointment": {
+      const c = cfg as { next_node_key?: string; timeout_node_key?: string };
+      const nextMatch = c.next_node_key === deletedKey;
+      const timeoutMatch = c.timeout_node_key === deletedKey;
+      if (!nextMatch && !timeoutMatch) return null;
+      return {
+        ...cfg,
+        ...(nextMatch ? { next_node_key: "" } : {}),
+        ...(timeoutMatch ? { timeout_node_key: "" } : {}),
+      };
     }
 
     case "condition": {
@@ -369,25 +421,31 @@ function patchedConfigWithoutKey(
     }
 
     case "send_buttons": {
-      const buttons = Array.isArray((cfg as { buttons?: unknown }).buttons)
-        ? (cfg as {
-            buttons: Array<Record<string, unknown>>;
-          }).buttons
+      const c = cfg as { timeout_node_key?: string; buttons?: unknown };
+      const timeoutMatch = c.timeout_node_key === deletedKey;
+      const buttons = Array.isArray(c.buttons)
+        ? (c.buttons as Array<Record<string, unknown>>)
         : [];
-      if (!buttons.some((b) => b.next_node_key === deletedKey)) return null;
+      const buttonsMatch = buttons.some((b) => b.next_node_key === deletedKey);
+      if (!timeoutMatch && !buttonsMatch) return null;
       return {
         ...cfg,
-        buttons: buttons.map((b) =>
-          b.next_node_key === deletedKey ? { ...b, next_node_key: "" } : b,
-        ),
+        ...(timeoutMatch ? { timeout_node_key: "" } : {}),
+        ...(buttonsMatch
+          ? {
+              buttons: buttons.map((b) =>
+                b.next_node_key === deletedKey ? { ...b, next_node_key: "" } : b,
+              ),
+            }
+          : {}),
       };
     }
 
     case "send_list": {
-      const sections = Array.isArray((cfg as { sections?: unknown }).sections)
-        ? (cfg as {
-            sections: Array<Record<string, unknown>>;
-          }).sections
+      const c = cfg as { timeout_node_key?: string; sections?: unknown };
+      const timeoutMatch = c.timeout_node_key === deletedKey;
+      const sections = Array.isArray(c.sections)
+        ? (c.sections as Array<Record<string, unknown>>)
         : [];
       let dirty = false;
       const next = sections.map((s) => {
@@ -405,7 +463,12 @@ function patchedConfigWithoutKey(
           }),
         };
       });
-      return dirty ? { ...cfg, sections: next } : null;
+      if (!timeoutMatch && !dirty) return null;
+      return {
+        ...cfg,
+        ...(timeoutMatch ? { timeout_node_key: "" } : {}),
+        ...(dirty ? { sections: next } : {}),
+      };
     }
 
     case "handoff":

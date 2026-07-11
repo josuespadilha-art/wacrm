@@ -974,6 +974,44 @@ async function advanceCurrentNodeKey(
 // Public entry point — the webhook calls this on every inbound.
 // ============================================================
 
+export async function executeNodeTimeout(
+  run_id: string,
+  timeout_node_key: string,
+): Promise<{ outcome: "advanced" | "completed" | "handed_off" | "error" }> {
+  const db = supabaseAdmin();
+  try {
+    const { data: run, error: runErr } = await db
+      .from("flow_runs")
+      .select("*")
+      .eq("id", run_id)
+      .single();
+
+    if (runErr || !run || run.status !== "active") return { outcome: "error" };
+
+    const { data: rawNodes, error: nodeErr } = await db
+      .from("flow_nodes")
+      .select("*")
+      .eq("flow_id", run.flow_id);
+
+    if (nodeErr || !rawNodes) return { outcome: "error" };
+
+    const nodes = new Map<string, FlowNodeRow>();
+    for (const n of rawNodes as FlowNodeRow[]) nodes.set(n.node_key, n);
+
+    if (!nodes.has(timeout_node_key)) return { outcome: "error" };
+
+    await logEvent(db, run.id, "timeout", run.current_node_key || "unknown", {
+      routed_to: timeout_node_key,
+    });
+
+    const outcome = await advanceFromNodeKey(db, run as FlowRunRow, timeout_node_key, nodes);
+    return { outcome: outcome.outcome };
+  } catch (err) {
+    console.error("[flows] executeNodeTimeout error:", err);
+    return { outcome: "error" };
+  }
+}
+
 export async function dispatchInboundToFlows(
   input: DispatchInboundInput & { isFirstInboundMessage: boolean },
 ): Promise<DispatchInboundResult> {

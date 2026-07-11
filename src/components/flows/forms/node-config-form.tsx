@@ -48,7 +48,7 @@ import {
 import { cn } from "@/lib/utils";
 import { uploadAccountMedia, MEDIA_MAX_BYTES } from "@/lib/storage/upload-media";
 import { slugify, type BuilderNode } from "../shared";
-import { NextNodeRow, NodeKeySelect, TextRow } from "./fields";
+import { NextNodeRow, NodeKeySelect, TextRow, TimeoutConfigFields } from "./fields";
 
 interface NodeConfigFormProps {
   node: BuilderNode;
@@ -164,12 +164,18 @@ export function NodeConfigForm({
             </p>
           </div>
           <NextNodeRow
-            value={(cfg as { next_node_key?: string }).next_node_key ?? ""}
-            allNodes={allNodes}
-            currentKey={node.node_key}
-            onChange={(v) => onUpdateConfig({ next_node_key: v })}
-            label={t("advanceAfterCapture")}
-          />
+          value={(cfg as { next_node_key?: string }).next_node_key ?? ""}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+          onChange={(v) => onUpdateConfig({ next_node_key: v })}
+          label={t("advanceAfterCapture")}
+        />
+        <TimeoutConfigFields
+          cfg={cfg as any}
+          onUpdateConfig={onUpdateConfig}
+          allNodes={allNodes}
+          currentKey={node.node_key}
+        />
         </>
       );
 
@@ -387,6 +393,12 @@ function SendButtonsForm({
           </Button>
         )}
       </div>
+      <TimeoutConfigFields
+        cfg={cfg as any}
+        onUpdateConfig={onUpdateConfig}
+        allNodes={allNodes}
+        currentKey={currentKey}
+      />
     </>
   );
 }
@@ -642,6 +654,12 @@ function SendListForm({
           </Button>
         )}
       </div>
+      <TimeoutConfigFields
+        cfg={cfg as any}
+        onUpdateConfig={onUpdateConfig}
+        allNodes={allNodes}
+        currentKey={currentKey}
+      />
     </>
   );
 }
@@ -893,6 +911,12 @@ function SetTagForm({
         currentKey={currentKey}
         onChange={(v) => onUpdateConfig({ next_node_key: v })}
         label={t("thenAdvanceTo")}
+      />
+      <TimeoutConfigFields
+        cfg={cfg as any}
+        onUpdateConfig={onUpdateConfig}
+        allNodes={allNodes}
+        currentKey={currentKey}
       />
     </>
   );

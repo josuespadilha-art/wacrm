@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/flows/admin-client'
 import { resolveFallbackPolicy } from '@/lib/flows/fallback'
+import { executeNodeTimeout } from '@/lib/flows/engine'
 
 /**
  * Sweep abandoned active flow runs.
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
   const { data: runs, error } = await admin
     .from('flow_runs')
     .select(
-      'id, flow_id, user_id, contact_id, last_advanced_at, flows ( fallback_policy )',
+      'id, flow_id, user_id, contact_id, last_advanced_at, current_node_key, flows ( fallback_policy )',
     )
     .eq('status', 'active')
 
@@ -70,7 +71,25 @@ export async function GET(request: Request) {
     user_id: string
     contact_id: string | null
     last_advanced_at: string
+    current_node_key: string | null
     flows: { fallback_policy: unknown } | { fallback_policy: unknown }[] | null
+  }
+
+  // Fetch all nodes for the active flows so we can check node-level timeouts
+  const flowIds = [...new Set(runs.map((r: any) => r.flow_id))]
+  const { data: allNodes } = await admin
+    .from('flow_nodes')
+    .select('flow_id, node_key, config')
+    .in('flow_id', flowIds)
+
+  const nodesByFlow = new Map<string, Map<string, any>>()
+  if (allNodes) {
+    for (const node of allNodes) {
+      if (!nodesByFlow.has(node.flow_id)) {
+        nodesByFlow.set(node.flow_id, new Map())
+      }
+      nodesByFlow.get(node.flow_id)!.set(node.node_key, node)
+    }
   }
 
   let swept = 0
@@ -79,6 +98,29 @@ export async function GET(request: Request) {
     const policy = resolveFallbackPolicy(flowsField?.fallback_policy ?? null)
     const lastAdvanced = new Date(r.last_advanced_at)
     const ageHours = (now.getTime() - lastAdvanced.getTime()) / (1000 * 60 * 60)
+    
+    // Check node-level timeout
+    let handledByNode = false
+    if (r.current_node_key && nodesByFlow.has(r.flow_id)) {
+      const node = nodesByFlow.get(r.flow_id)!.get(r.current_node_key)
+      if (node && node.config) {
+        const cfg = node.config as { timeout_minutes?: number; timeout_node_key?: string }
+        if (cfg.timeout_minutes && cfg.timeout_node_key) {
+          const timeoutHours = cfg.timeout_minutes / 60
+          if (ageHours >= timeoutHours) {
+            // Node timeout exceeded! Follow the alternate path.
+            await executeNodeTimeout(r.id, cfg.timeout_node_key)
+            swept += 1
+            handledByNode = true
+          } else {
+            // Still within the custom node timeout. Don't apply global sweep yet.
+            handledByNode = true
+          }
+        }
+      }
+    }
+
+    if (handledByNode) continue
     if (ageHours < policy.on_timeout_hours) continue
 
     // Mark timed_out — guarded by the precondition `status='active'`

@@ -154,6 +154,51 @@ export function NextNodeRow({
   );
 }
 
+export function TimeoutConfigFields({
+  cfg,
+  onUpdateConfig,
+  allNodes,
+  currentKey,
+}: {
+  cfg: { timeout_minutes?: number; timeout_node_key?: string };
+  onUpdateConfig: (patch: Record<string, unknown>) => void;
+  allNodes: BuilderNode[];
+  currentKey: string;
+}) {
+  const t = useTranslations("Flows.builder.form");
+  return (
+    <div className="space-y-4 pt-4 border-t border-border mt-4">
+      <div className="space-y-1">
+        <label className="text-xs font-medium">Tempo limite (minutos)</label>
+        <Input
+          type="number"
+          min="1"
+          placeholder="Ex: 60 para 1 hora"
+          value={cfg.timeout_minutes || ""}
+          onChange={(e) => {
+            const val = parseInt(e.target.value, 10);
+            onUpdateConfig({ timeout_minutes: isNaN(val) ? undefined : val });
+          }}
+          className="bg-muted"
+        />
+        <p className="text-[0.8rem] text-muted-foreground pt-1">
+          Se o cliente não responder neste tempo, o fluxo seguirá pela rota abaixo.
+        </p>
+      </div>
+      <div>
+        <label className="mb-1 block text-xs text-muted-foreground">Se não responder (Timeout), avançar para:</label>
+        <NodeKeySelect
+          value={cfg.timeout_node_key || null}
+          nodes={allNodes}
+          excludeKey={currentKey}
+          onChange={(v) => onUpdateConfig({ timeout_node_key: v ?? "" })}
+          placeholder={t("pickNextNode")}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function NodeKeySelect({
   value,
   nodes,

@@ -750,6 +750,36 @@ function validateNode(
       });
   }
 
+  // Timeout validation for interactive nodes
+  if (
+    node.node_type === "collect_input" ||
+    node.node_type === "send_buttons" ||
+    node.node_type === "send_list" ||
+    node.node_type === "appointment"
+  ) {
+    const c = node.config as { timeout_minutes?: number; timeout_node_key?: string };
+    if (c.timeout_node_key) {
+      if (!knownKeys.has(c.timeout_node_key)) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "timeout_node_key",
+          message: `Timeout path points to non-existent node "${c.timeout_node_key}".`,
+        });
+      }
+      if (!c.timeout_minutes || c.timeout_minutes <= 0) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "timeout_minutes",
+          message: "Timeout path requires a valid timeout in minutes.",
+        });
+      }
+    }
+  }
+
   return issues;
 }
 
@@ -784,10 +814,18 @@ function outgoingEdges(node: NodeInput): string[] {
     case "start":
     case "send_message":
     case "send_media":
-    case "collect_input":
-    case "set_tag":
-    case "appointment": {
+    case "set_tag": {
       const cfg = node.config as { next_node_key?: string };
+      return cfg.next_node_key ? [cfg.next_node_key] : [];
+    }
+    case "collect_input":
+    case "appointment": {
+      const cfg = node.config as { next_node_key?: string; timeout_node_key?: string };
+      const out: string[] = [];
+      if (cfg.next_node_key) out.push(cfg.next_node_key);
+      if (cfg.timeout_node_key) out.push(cfg.timeout_node_key);
+      return out;
+    }
       return cfg.next_node_key ? [cfg.next_node_key] : [];
     }
     case "condition": {
@@ -803,14 +841,18 @@ function outgoingEdges(node: NodeInput): string[] {
     case "send_buttons": {
       const cfg = node.config as {
         buttons?: Array<{ next_node_key?: string }>;
+        timeout_node_key?: string;
       };
-      return (cfg.buttons ?? [])
+      const out = (cfg.buttons ?? [])
         .map((b) => b.next_node_key)
         .filter((k): k is string => !!k);
+      if (cfg.timeout_node_key) out.push(cfg.timeout_node_key);
+      return out;
     }
     case "send_list": {
       const cfg = node.config as {
         sections?: Array<{ rows?: Array<{ next_node_key?: string }> }>;
+        timeout_node_key?: string;
       };
       const out: string[] = [];
       for (const s of cfg.sections ?? []) {
@@ -818,6 +860,7 @@ function outgoingEdges(node: NodeInput): string[] {
           if (r.next_node_key) out.push(r.next_node_key);
         }
       }
+      if (cfg.timeout_node_key) out.push(cfg.timeout_node_key);
       return out;
     }
     case "handoff":
