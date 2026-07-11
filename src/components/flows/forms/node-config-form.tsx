@@ -1227,7 +1227,11 @@ function PipelineConfigFields({
           onValueChange={(val) => onChange({ pipeline_id: val ?? undefined, stage_id: "" })}
         >
           <SelectTrigger className="bg-muted text-xs">
-            <SelectValue placeholder="Selecione um funil" />
+            <div className="truncate">
+              {pipelineId 
+                ? pipelines.find((p) => p.id === pipelineId)?.name || pipelineId 
+                : "Selecione um funil"}
+            </div>
           </SelectTrigger>
           <SelectContent>
             {pipelines.map((p) => (
@@ -1246,7 +1250,11 @@ function PipelineConfigFields({
           disabled={!pipelineId || stageOptions.length === 0}
         >
           <SelectTrigger className="bg-muted text-xs">
-            <SelectValue placeholder="Selecione a etapa" />
+            <div className="truncate">
+              {stageId 
+                ? stageOptions.find((s) => s.id === stageId)?.name || stageId 
+                : "Selecione uma etapa"}
+            </div>
           </SelectTrigger>
           <SelectContent>
             {stageOptions.map((s) => (
