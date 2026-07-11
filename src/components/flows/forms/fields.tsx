@@ -45,7 +45,14 @@ export function TextRow({
   value,
   onChange,
   rows = 1,
-  availableVars = ["contact.name", "contact.phone"],
+  availableVars = [
+    "contact.name",
+    "contact.phone",
+    "contact.email",
+    "vars.agendamento_data",
+    "vars.agendamento_hora",
+    "vars.sua_chave",
+  ],
 }: {
   label: string;
   value: string;
@@ -83,11 +90,20 @@ export function TextRow({
             Variáveis
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48 max-h-[300px] overflow-y-auto text-xs">
-            {availableVars.map((v) => (
-              <DropdownMenuItem key={v} onClick={() => insertVar(`{{${v}}}`)}>
-                {v === "contact.name" ? "Nome do Cliente" : v === "contact.phone" ? "Telefone" : v}
-              </DropdownMenuItem>
-            ))}
+            {availableVars.map((v) => {
+              let label = v;
+              if (v === "contact.name") label = "Nome do Cliente";
+              else if (v === "contact.phone") label = "Telefone";
+              else if (v === "contact.email") label = "E-mail";
+              else if (v === "vars.agendamento_data") label = "Data do Agendamento";
+              else if (v === "vars.agendamento_hora") label = "Hora do Agendamento";
+              else if (v === "vars.sua_chave") label = "Variável Personalizada";
+              return (
+                <DropdownMenuItem key={v} onClick={() => insertVar(`{{${v}}}`)}>
+                  {label}
+                </DropdownMenuItem>
+              );
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
