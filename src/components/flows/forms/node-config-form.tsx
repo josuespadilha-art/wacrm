@@ -147,7 +147,7 @@ export function NodeConfigForm({
               value={(cfg as { var_key?: string }).var_key ?? ""}
               onChange={(e) =>
                 onUpdateConfig({
-                  var_key: e.target.value.replace(/[^a-zA-Z0-9_]/g, ""),
+                  var_key: e.target.value.replace(/[^a-zA-Z0-9_.]/g, ""),
                 })
               }
               placeholder={t("varKeyPlaceholder")}
@@ -314,7 +314,7 @@ function SendButtonsForm({
           value={cfg.var_key ?? ""}
           onChange={(e) =>
             onUpdateConfig({
-              var_key: e.target.value.replace(/[^a-zA-Z0-9_]/g, ""),
+              var_key: e.target.value.replace(/[^a-zA-Z0-9_.]/g, ""),
             })
           }
           placeholder="Ex: profissional_escolhido"
@@ -528,7 +528,7 @@ function SendListForm({
           value={cfg.var_key ?? ""}
           onChange={(e) =>
             onUpdateConfig({
-              var_key: e.target.value.replace(/[^a-zA-Z0-9_]/g, ""),
+              var_key: e.target.value.replace(/[^a-zA-Z0-9_.]/g, ""),
             })
           }
           placeholder="Ex: servico_escolhido"
