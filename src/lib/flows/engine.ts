@@ -475,8 +475,23 @@ async function sendAppointmentListAndSuspend(
     const dayConfig = opHours?.find((h: any) => h.day_of_week === dayOfWeek);
     if (!dayConfig || dayConfig.is_closed) continue;
     
-    const [openH, openM] = dayConfig.open_time.split(':').map(Number);
-    const [closeH, closeM] = dayConfig.close_time.split(':').map(Number);
+    let [openH, openM] = dayConfig.open_time.split(':').map(Number);
+    let [closeH, closeM] = dayConfig.close_time.split(':').map(Number);
+    
+    // Filtro por período baseado na variável capturada (ex: vars.periodo)
+    const periodo = String(run.vars.periodo || '').toLowerCase();
+    if (periodo.includes('manha') || periodo.includes('manhã')) {
+      if (closeH > 11) { closeH = 11; closeM = 0; }
+    } else if (periodo.includes('tarde')) {
+      if (openH < 13) { openH = 13; openM = 0; }
+      if (closeH > 17 || (closeH === 17 && closeM > 30)) { closeH = 17; closeM = 30; }
+    } else if (periodo.includes('noite')) {
+      if (openH < 17 || (openH === 17 && openM < 30)) { openH = 17; openM = 30; }
+      if (closeH === 0) { closeH = 24; closeM = 0; }
+    }
+    
+    // Pula o dia se o período filtrado for inválido para o horário de funcionamento
+    if (openH > closeH || (openH === closeH && openM >= closeM)) continue;
     
     let currentSlot = new Date(Date.UTC(brMidnight.getUTCFullYear(), brMidnight.getUTCMonth(), brMidnight.getUTCDate(), openH + tzOffset, openM));
     const endTime = new Date(Date.UTC(brMidnight.getUTCFullYear(), brMidnight.getUTCMonth(), brMidnight.getUTCDate(), closeH + tzOffset, closeM));
