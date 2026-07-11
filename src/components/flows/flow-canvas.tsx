@@ -293,21 +293,17 @@ function FlowCanvasInner() {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
-    const onFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
     };
-    document.addEventListener('fullscreenchange', onFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
-  }, []);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      wrapperRef.current?.requestFullscreen().catch((err) => {
-        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-      });
-    } else {
-      document.exitFullscreen();
-    }
+    setIsFullscreen(!isFullscreen);
   };
 
 
@@ -544,7 +540,13 @@ function FlowCanvasInner() {
 
   return (
     <>
-      <div ref={wrapperRef} className="h-full w-full overflow-hidden bg-background">
+      <div 
+        ref={wrapperRef} 
+        className={cn(
+          "overflow-hidden bg-background", 
+          isFullscreen ? "fixed inset-0 z-40" : "h-full w-full"
+        )}
+      >
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}
