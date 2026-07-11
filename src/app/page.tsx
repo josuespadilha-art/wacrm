@@ -886,7 +886,7 @@ export default function LandingPage() {
                     <span>Cliente: Marcos Silva</span>
                     <span className="obj">Objeção: Preço</span>
                   </div>
-                  <p>"Gostei muito da proposta, mas achei o valor um pouco acima do que estávamos planejando gastar agora."</p>
+                  <p>&quot;Gostei muito da proposta, mas achei o valor um pouco acima do que estávamos planejando gastar agora.&quot;</p>
                 </div>
                 
                 <div className="ai-suggestion">
