@@ -1144,7 +1144,8 @@
       "categories": {
         "messaging": "Mensagens",
         "logic": "Lógica e dados",
-        "flow": "Controle de fluxo"
+        "flow": "Controle de fluxo",
+        "crm": "Ações do CRM"
       },
       "nodes": {
         "start": {
@@ -1190,6 +1191,10 @@
         "end": {
           "label": "Fim",
           "blurb": "Encerra o fluxo"
+        },
+        "change_pipeline_stage": {
+          "label": "Mover no Funil",
+          "blurb": "Move o lead para uma etapa específica de um funil de vendas."
         }
       }
     },
