@@ -226,6 +226,7 @@ const NODE_HUE: Record<NodeType, { l: number; c: number; h: number }> = {
   set_tag: { l: 0.65, c: 0.15, h: 350 }, // pink
   handoff: { l: 0.65, c: 0.17, h: 16 }, // rose — hands off
   appointment: { l: 0.55, c: 0.18, h: 10 }, // red/rose - agenda
+  change_pipeline_stage: { l: 0.65, c: 0.18, h: 60 }, // amber/orange - crm
   end: { l: 0.55, c: 0.01, h: 260 }, // neutral grey — terminal
 };
 

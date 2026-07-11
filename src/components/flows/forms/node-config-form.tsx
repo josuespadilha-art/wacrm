@@ -248,8 +248,8 @@ export function NodeConfigForm({
               Move o lead para uma etapa específica de um funil de vendas. Se o lead não tiver um negócio aberto neste funil, um novo será criado automaticamente.
             </div>
             <PipelineConfigFields
-              pipelineId={(cfg as any).pipeline_id ?? ""}
-              stageId={(cfg as any).stage_id ?? ""}
+              pipelineId={(cfg as any).pipeline_id || undefined}
+              stageId={(cfg as any).stage_id || undefined}
               onChange={(patch) => onUpdateConfig(patch)}
             />
             <NextNodeRow
@@ -1174,8 +1174,8 @@ function PipelineConfigFields({
   stageId,
   onChange,
 }: {
-  pipelineId: string;
-  stageId: string;
+  pipelineId: string | undefined;
+  stageId: string | undefined;
   onChange: (patch: { pipeline_id?: string; stage_id?: string }) => void;
 }) {
   const [pipelines, setPipelines] = useState<any[]>([]);

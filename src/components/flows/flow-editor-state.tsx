@@ -187,6 +187,8 @@ export function defaultConfigFor(type: NodeType): Record<string, unknown> {
       return { note: "" };
     case "appointment":
       return { service: "", employee_id: "", variable_name: "", next_node_key: "" };
+    case "change_pipeline_stage":
+      return { pipeline_id: "", stage_id: "", next_node_key: "" };
     case "end":
       return {};
   }
