@@ -567,7 +567,7 @@ function validateNode(
           field: "var_key",
           message: "Collect-input needs a var_key to store the answer under.",
         });
-      } else if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(cfg.var_key)) {
+      } else if (!/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(cfg.var_key)) {
         issues.push({
           severity: "error",
           scope: "node",
