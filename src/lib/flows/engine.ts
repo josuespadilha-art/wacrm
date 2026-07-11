@@ -56,6 +56,7 @@ import {
   type SetTagNodeConfig,
   type StartNodeConfig,
   type KeywordTriggerConfig,
+  type AppointmentNodeConfig,
 } from "./types";
 
 // ============================================================
@@ -125,7 +126,8 @@ export function isSuspending(node_type: string): boolean {
   return (
     node_type === "send_buttons" ||
     node_type === "send_list" ||
-    node_type === "collect_input"
+    node_type === "collect_input" ||
+    node_type === "appointment"
   );
 }
 
@@ -427,6 +429,76 @@ async function sendListAndSuspend(
       last_prompt_message_id: (msg as { id: string } | null)?.id ?? null,
     })
     .eq("id", run.id);
+  return { outcome: "advanced", node_key: node.node_key };
+}
+
+async function sendAppointmentListAndSuspend(
+  db: AdminClient,
+  run: FlowRunRow,
+  node: FlowNodeRow,
+): Promise<{ outcome: "advanced"; node_key: string }> {
+  const cfg = node.config as unknown as AppointmentNodeConfig;
+  
+  // Mock basico de próximos dias para demonstração (Fase 4 simplificada)
+  const now = new Date();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const nextWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+  
+  const formatDate = (d: Date) => d.toISOString().split('T')[0];
+  
+  const slots = [
+    {
+      id: `${formatDate(tomorrow)}T09:00:00.000Z`,
+      title: "Amanhã - 09:00",
+      description: "Disponível"
+    },
+    {
+      id: `${formatDate(tomorrow)}T14:00:00.000Z`,
+      title: "Amanhã - 14:00",
+      description: "Disponível"
+    },
+    {
+      id: `${formatDate(nextWeek)}T10:00:00.000Z`,
+      title: "Depois de amanhã",
+      description: "10:00 - Disponível"
+    }
+  ];
+
+  const { whatsapp_message_id } = await engineSendInteractiveList({
+    accountId: run.account_id,
+    userId: run.user_id,
+    conversationId: run.conversation_id!,
+    contactId: run.contact_id!,
+    bodyText: `Por favor, escolha um horário para o serviço ${cfg.service || 'agendado'}:`,
+    buttonLabel: "Ver horários",
+    headerText: "Agendamento",
+    footerText: "Selecione uma opção da lista",
+    sections: [{
+      title: "Horários Disponíveis",
+      rows: slots
+    }],
+  });
+
+  await logEvent(db, run.id, "message_sent", node.node_key, {
+    node_type: "appointment",
+    whatsapp_message_id,
+  });
+  
+  return { outcome: "advanced", node_key: node.node_key };
+
+  const { data: msg } = await db
+    .from("messages")
+    .select("id")
+    .eq("message_id", whatsapp_message_id)
+    .maybeSingle();
+
+  await db
+    .from("flow_runs")
+    .update({
+      last_prompt_message_id: (msg as { id: string } | null)?.id ?? null,
+    })
+    .eq("id", run.id);
+
   return { outcome: "advanced", node_key: node.node_key };
 }
 
@@ -763,6 +835,21 @@ async function advanceFromNodeKey(
       }
       return { outcome: "advanced" };
     }
+    if (node.node_type === "appointment") {
+      await sendAppointmentListAndSuspend(db, run, node);
+      const advanced = await advanceCurrentNodeKey(
+        db,
+        run.id,
+        run.current_node_key,
+        node.node_key,
+      );
+      if (!advanced) {
+        await logEvent(db, run.id, "error", node.node_key, {
+          reason: "lost_race_during_advance",
+        });
+      }
+      return { outcome: "advanced" };
+    }
     if (node.node_type === "handoff") {
       await executeHandoff(db, run, node);
       return { outcome: "handed_off" };
@@ -930,6 +1017,38 @@ async function handleReplyForActiveRun(
       currentNode.node_type === "send_list")
   ) {
     matched = matchReplyId(currentNode, message.reply_id);
+  } else if (
+    message.kind === "interactive_reply" &&
+    currentNode.node_type === "appointment"
+  ) {
+    const cfg = currentNode.config as unknown as AppointmentNodeConfig;
+    const selectedTimeStr = message.reply_id; 
+    const selectedTime = new Date(selectedTimeStr);
+    
+    // Save to DB
+    const { error: apptErr } = await db.from("appointments").insert({
+      account_id: run.account_id,
+      contact_id: run.contact_id!,
+      assignee_id: cfg.employee_id || null,
+      start_time: selectedTimeStr,
+      end_time: new Date(selectedTime.getTime() + 60 * 60 * 1000).toISOString(), // 1 hora
+      status: 'scheduled',
+      notes: `Agendado via WhatsApp (${cfg.service || 'Serviço'})`
+    });
+
+    if (!apptErr) {
+      if (cfg.variable_name) {
+        const newVars = { ...run.vars, [cfg.variable_name]: selectedTimeStr };
+        run.vars = newVars;
+        await db.from("flow_runs").update({ vars: newVars, reprompt_count: 0 }).eq("id", run.id);
+      } else {
+        await db.from("flow_runs").update({ reprompt_count: 0 }).eq("id", run.id);
+      }
+      await logEvent(db, run.id, "node_entered", currentNode.node_key, {
+        appointment_time: selectedTimeStr
+      });
+      matched = cfg.next_node_key;
+    }
   } else if (
     message.kind === "text" &&
     currentNode.node_type === "collect_input"

@@ -31,6 +31,15 @@ import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
 import { NODE_META, type BuilderNode } from "../shared";
 
+import { useRef } from "react";
+import { Braces } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 export function TextRow({
   label,
   value,
@@ -42,11 +51,48 @@ export function TextRow({
   onChange: (v: string) => void;
   rows?: number;
 }) {
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+
+  const insertVar = (variable: string) => {
+    const el = inputRef.current;
+    if (!el) {
+      onChange(value + variable);
+      return;
+    }
+    const start = el.selectionStart || 0;
+    const end = el.selectionEnd || 0;
+    const newValue = value.slice(0, start) + variable + value.slice(end);
+    onChange(newValue);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + variable.length, start + variable.length);
+    }, 0);
+  };
+
   return (
     <div>
-      <label className="mb-1 block text-xs text-muted-foreground">{label}</label>
+      <div className="mb-1 flex items-center justify-between">
+        <label className="block text-xs text-muted-foreground">{label}</label>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <Braces className="h-3 w-3" />
+            Variáveis
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 text-xs">
+            <DropdownMenuItem onClick={() => insertVar("{{contact.name}}")}>
+              Nome do Cliente
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => insertVar("{{contact.phone}}")}>
+              Telefone
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       {rows > 1 ? (
         <Textarea
+          ref={inputRef as any}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           rows={rows}
@@ -54,6 +100,7 @@ export function TextRow({
         />
       ) : (
         <Input
+          ref={inputRef as any}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className="bg-muted"

@@ -57,6 +57,8 @@ interface InteractiveBuilderProps {
   onChange: (payload: InteractiveMessagePayload) => void;
   /** Show the live WhatsApp-style preview beside the form. Default true. */
   showPreview?: boolean;
+  /** Optional function to render a variable selector that inserts text. */
+  renderVariableSelector?: (onSelect: (v: string) => void) => React.ReactNode;
 }
 
 /**
@@ -70,6 +72,7 @@ export function InteractiveBuilder({
   value,
   onChange,
   showPreview = true,
+  renderVariableSelector,
 }: InteractiveBuilderProps) {
   const [advanced, setAdvanced] = useState(false);
   const validation = validateInteractivePayload(value);
@@ -88,7 +91,7 @@ export function InteractiveBuilder({
   };
 
   return (
-    <div className="flex flex-col gap-4 md:flex-row">
+    <div className="flex flex-col gap-4 xl:flex-row">
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         {/* Kind toggle */}
         <div className="flex gap-2">
@@ -104,7 +107,14 @@ export function InteractiveBuilder({
           />
         </div>
 
-        <Field label="Body" counter={`${value.body.length}/${INTERACTIVE_LIMITS.bodyMaxLength}`}>
+        <Field 
+          label="Body" 
+          counter={`${value.body.length}/${INTERACTIVE_LIMITS.bodyMaxLength}`}
+          action={renderVariableSelector?.((v) => {
+            const cur = value.body || "";
+            setField({ body: cur + (cur.endsWith(" ") || !cur ? "" : " ") + v })
+          })}
+        >
           <Textarea
             value={value.body}
             maxLength={INTERACTIVE_LIMITS.bodyMaxLength}
@@ -118,6 +128,10 @@ export function InteractiveBuilder({
           <Field
             label="Header (optional)"
             counter={`${(value.header ?? "").length}/${INTERACTIVE_LIMITS.headerTextMaxLength}`}
+            action={renderVariableSelector?.((v) => {
+              const cur = value.header || "";
+              setField({ header: cur + (cur.endsWith(" ") || !cur ? "" : " ") + v })
+            })}
           >
             <Input
               value={value.header ?? ""}
@@ -129,6 +143,10 @@ export function InteractiveBuilder({
           <Field
             label="Footer (optional)"
             counter={`${(value.footer ?? "").length}/${INTERACTIVE_LIMITS.footerMaxLength}`}
+            action={renderVariableSelector?.((v) => {
+              const cur = value.footer || "";
+              setField({ footer: cur + (cur.endsWith(" ") || !cur ? "" : " ") + v })
+            })}
           >
             <Input
               value={value.footer ?? ""}
@@ -140,9 +158,9 @@ export function InteractiveBuilder({
         </div>
 
         {value.kind === "buttons" ? (
-          <ButtonsEditor value={value} onChange={onChange} advanced={advanced} />
+          <ButtonsEditor value={value} onChange={onChange} advanced={advanced} renderVariableSelector={renderVariableSelector} />
         ) : (
-          <ListEditor value={value} onChange={onChange} advanced={advanced} />
+          <ListEditor value={value} onChange={onChange} advanced={advanced} renderVariableSelector={renderVariableSelector} />
         )}
 
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -182,10 +200,12 @@ function ButtonsEditor({
   value,
   onChange,
   advanced,
+  renderVariableSelector,
 }: {
   value: InteractiveButtonsPayload;
   onChange: (p: InteractiveMessagePayload) => void;
   advanced: boolean;
+  renderVariableSelector?: (onSelect: (v: string) => void) => React.ReactNode;
 }) {
   const buttons = value.buttons;
   const update = (idx: number, patch: Partial<InteractiveButtonsPayload["buttons"][number]>) =>
@@ -223,13 +243,23 @@ function ButtonsEditor({
                 className="w-28 bg-muted font-mono text-xs"
               />
             )}
-            <Input
-              value={b.title}
-              maxLength={INTERACTIVE_LIMITS.buttonTitleMaxLength}
-              onChange={(e) => update(i, { title: e.target.value })}
-              placeholder="Button label"
-              className="flex-1 bg-muted"
-            />
+            <div className="relative flex-1">
+              <Input
+                value={b.title}
+                maxLength={INTERACTIVE_LIMITS.buttonTitleMaxLength}
+                onChange={(e) => update(i, { title: e.target.value })}
+                placeholder="Button label"
+                className="w-full bg-muted pr-8"
+              />
+              {renderVariableSelector && (
+                <div className="absolute right-1 top-1">
+                  {renderVariableSelector((v) => {
+                    const cur = b.title || "";
+                    update(i, { title: cur + (cur.endsWith(" ") || !cur ? "" : " ") + v })
+                  })}
+                </div>
+              )}
+            </div>
             <span className="w-10 shrink-0 text-right text-[10px] text-muted-foreground">
               {b.title.length}/{INTERACTIVE_LIMITS.buttonTitleMaxLength}
             </span>
@@ -264,10 +294,12 @@ function ListEditor({
   value,
   onChange,
   advanced,
+  renderVariableSelector,
 }: {
   value: InteractiveListPayload;
   onChange: (p: InteractiveMessagePayload) => void;
   advanced: boolean;
+  renderVariableSelector?: (onSelect: (v: string) => void) => React.ReactNode;
 }) {
   const sections = value.sections;
   const totalRows = sections.reduce((n, s) => n + s.rows.length, 0);
@@ -336,12 +368,23 @@ function ListEditor({
       {sections.map((section, sIdx) => (
         <div key={sIdx} className="rounded-md border border-border bg-muted/40 p-2">
           <div className="mb-2 flex items-center gap-2">
-            <Input
-              value={section.title ?? ""}
-              onChange={(e) => updateSection(sIdx, { title: e.target.value })}
-              placeholder="Section title (optional)"
-              className="flex-1 bg-muted text-xs"
-            />
+            <div className="relative flex-1">
+              <Input
+                value={section.title ?? ""}
+                maxLength={24}
+                onChange={(e) => updateSection(sIdx, { title: e.target.value })}
+                placeholder="Section title (e.g. Products)"
+                className="w-full bg-muted text-xs font-semibold pr-8"
+              />
+              {renderVariableSelector && (
+                <div className="absolute right-1 top-1">
+                  {renderVariableSelector((v) => {
+                    const cur = section.title || "";
+                    updateSection(sIdx, { title: cur + (cur.endsWith(" ") || !cur ? "" : " ") + v })
+                  })}
+                </div>
+              )}
+            </div>
             {sections.length > 1 && (
               <Button
                 variant="ghost"
@@ -367,13 +410,23 @@ function ListEditor({
                       className="w-24 bg-muted font-mono text-xs"
                     />
                   )}
-                  <Input
-                    value={row.title}
-                    maxLength={INTERACTIVE_LIMITS.listRowTitleMaxLength}
-                    onChange={(e) => updateRow(sIdx, rIdx, { title: e.target.value })}
-                    placeholder="Row title"
-                    className="flex-1 bg-muted"
-                  />
+                  <div className="relative flex-1">
+                    <Input
+                      value={row.title}
+                      maxLength={INTERACTIVE_LIMITS.listRowTitleMaxLength}
+                      onChange={(e) => updateRow(sIdx, rIdx, { title: e.target.value })}
+                      placeholder="Row title"
+                      className="w-full bg-muted pr-8"
+                    />
+                    {renderVariableSelector && (
+                      <div className="absolute right-1 top-1">
+                        {renderVariableSelector((v) => {
+                          const cur = row.title || "";
+                          updateRow(sIdx, rIdx, { title: cur + (cur.endsWith(" ") || !cur ? "" : " ") + v })
+                        })}
+                      </div>
+                    )}
+                  </div>
                   <span className="w-10 shrink-0 text-right text-[10px] text-muted-foreground">
                     {row.title.length}/{INTERACTIVE_LIMITS.listRowTitleMaxLength}
                   </span>
@@ -388,13 +441,23 @@ function ListEditor({
                     </Button>
                   )}
                 </div>
-                <Input
-                  value={row.description ?? ""}
-                  maxLength={INTERACTIVE_LIMITS.listRowDescriptionMaxLength}
-                  onChange={(e) => updateRow(sIdx, rIdx, { description: e.target.value })}
-                  placeholder="Description (optional)"
-                  className="mt-2 bg-muted text-xs"
-                />
+                <div className="relative mt-2">
+                  <Input
+                    value={row.description ?? ""}
+                    maxLength={INTERACTIVE_LIMITS.listRowDescriptionMaxLength}
+                    onChange={(e) => updateRow(sIdx, rIdx, { description: e.target.value })}
+                    placeholder="Description (optional)"
+                    className="w-full bg-muted text-xs pr-8"
+                  />
+                  {renderVariableSelector && (
+                    <div className="absolute right-1 top-1">
+                      {renderVariableSelector((v) => {
+                        const cur = row.description || "";
+                        updateRow(sIdx, rIdx, { description: cur + (cur.endsWith(" ") || !cur ? "" : " ") + v })
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -450,17 +513,22 @@ function KindButton({
 function Field({
   label,
   counter,
+  action,
   children,
 }: {
   label: string;
   counter?: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
         <label className="text-xs text-muted-foreground">{label}</label>
-        {counter && <span className="text-[10px] text-muted-foreground">{counter}</span>}
+        <div className="flex items-center gap-2">
+          {action}
+          {counter && <span className="text-[10px] text-muted-foreground">{counter}</span>}
+        </div>
       </div>
       {children}
     </div>

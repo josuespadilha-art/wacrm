@@ -39,6 +39,18 @@ export const TRIGGER_META: Record<AutomationTriggerType, TriggerMeta> = {
     label: 'Button / List Reply',
     pillClass: 'border-pink-500/30 bg-pink-500/10 text-pink-300',
   },
+  pipeline_stage_changed: {
+    label: 'Pipeline Stage Changed',
+    pillClass: 'border-orange-500/30 bg-orange-500/10 text-orange-300',
+  },
+  inactivity: {
+    label: 'Inactivity',
+    pillClass: 'border-stone-500/30 bg-stone-500/10 text-stone-300',
+  },
+  birthday: {
+    label: 'Birthday',
+    pillClass: 'border-rose-500/30 bg-rose-500/10 text-rose-300',
+  },
 }
 
 export function triggerMeta(t: AutomationTriggerType | string): TriggerMeta {

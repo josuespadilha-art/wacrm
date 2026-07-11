@@ -23,6 +23,7 @@ import {
   ListChecks,
   ListPlus,
   MessageCircle,
+  Calendar,
   Paperclip,
   PlayCircle,
   Tag,
@@ -50,6 +51,7 @@ export type NodeType =
   | 'condition'
   | 'set_tag'
   | 'handoff'
+  | 'appointment'
   | 'end';
 
 export interface BuilderNode {
@@ -159,6 +161,13 @@ export const NODE_META: Record<
     blurb: 'Hands the conversation to a human',
     category: 'flow',
   },
+  appointment: {
+    label: 'Agendamento',
+    icon: Calendar,
+    color: 'text-rose-500',
+    blurb: 'Oferece horários e salva na agenda',
+    category: 'logic',
+  },
   end: {
     label: 'End',
     icon: Flag,
@@ -206,6 +215,7 @@ const NODE_HUE: Record<NodeType, { l: number; c: number; h: number }> = {
   condition: { l: 0.72, c: 0.15, h: 65 }, // amber — a fork in the road
   set_tag: { l: 0.65, c: 0.15, h: 350 }, // pink
   handoff: { l: 0.65, c: 0.17, h: 16 }, // rose — hands off
+  appointment: { l: 0.55, c: 0.18, h: 10 }, // red/rose - agenda
   end: { l: 0.55, c: 0.01, h: 260 }, // neutral grey — terminal
 };
 
@@ -314,6 +324,10 @@ export function summarizeNode(
     case 'start':
     case 'end':
       return null;
+    case 'appointment': {
+      const svc = (cfg as any).service;
+      return svc ? `Agendar: ${truncate(svc, 30)}` : 'Oferecer opções de horário';
+    }
     case 'send_message': {
       const text = typeof cfg.text === 'string' ? cfg.text : '';
       return text.length > 0 ? truncate(text) : null;

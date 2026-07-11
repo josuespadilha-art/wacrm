@@ -33,6 +33,8 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
   const todayStart = startOfLocalDay().toISOString()
   const yesterdayStart = daysAgoStart(1).toISOString()
 
+  const sevenDaysAgo = daysAgoStart(7).toISOString()
+
   const [
     openConvCur,
     newConvToday,
@@ -42,6 +44,10 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
     openDeals,
     messagesToday,
     messagesYesterday,
+    salesToday,
+    salesYesterday,
+    atRiskDeals,
+    lostDeals,
   ] = await Promise.all([
     db.from('conversations').select('id', { count: 'exact', head: true }).eq('status', 'open'),
     db
@@ -73,10 +79,28 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
       .eq('sender_type', 'agent')
       .gte('created_at', yesterdayStart)
       .lt('created_at', todayStart),
+    db.from('sales').select('total_value').gte('created_at', todayStart),
+    db.from('sales').select('total_value').gte('created_at', yesterdayStart).lt('created_at', todayStart),
+    db
+      .from('deals')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'open')
+      .lt('updated_at', sevenDaysAgo),
+    db
+      .from('deals')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'lost')
+      .gte('updated_at', sevenDaysAgo),
   ])
 
   const openDealsRows = (openDeals.data ?? []) as { value: number | null }[]
   const openDealsValue = openDealsRows.reduce((sum, d) => sum + (d.value ?? 0), 0)
+
+  const salesTodayRows = (salesToday.data ?? []) as { total_value: number | null }[]
+  const salesTodayValue = salesTodayRows.reduce((sum, s) => sum + (s.total_value ?? 0), 0)
+
+  const salesYesterdayRows = (salesYesterday.data ?? []) as { total_value: number | null }[]
+  const salesYesterdayValue = salesYesterdayRows.reduce((sum, s) => sum + (s.total_value ?? 0), 0)
 
   return {
     activeConversations: {
@@ -96,6 +120,16 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
       current: messagesToday.count ?? 0,
       previous: messagesYesterday.count ?? 0,
     },
+    todaySalesRevenue: {
+      current: salesTodayValue,
+      previous: salesYesterdayValue,
+    },
+    todaySalesCount: {
+      current: salesTodayRows.length,
+      previous: salesYesterdayRows.length,
+    },
+    contactsAtRiskCount: atRiskDeals.count ?? 0,
+    contactsToReactivateCount: lostDeals.count ?? 0,
   }
 }
 

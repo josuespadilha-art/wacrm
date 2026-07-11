@@ -101,7 +101,7 @@ export function EditorHeader() {
             onClick={() => router.push(`/flows/${flow.id}/runs`)}
           >
             <History className="h-3.5 w-3.5" />
-            Runs
+            <span>Runs</span>
             <span className="ml-0.5 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
               {flow.execution_count}
             </span>
@@ -113,7 +113,7 @@ export function EditorHeader() {
             className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            Delete
+            <span>Delete</span>
           </Button>
           {state.status === "active" ? (
             <Button
@@ -127,7 +127,7 @@ export function EditorHeader() {
               ) : (
                 <PauseCircle className="h-3.5 w-3.5" />
               )}
-              Pause
+              <span>Pause</span>
             </Button>
           ) : (
             <Button
@@ -146,7 +146,7 @@ export function EditorHeader() {
               ) : (
                 <PlayCircle className="h-3.5 w-3.5" />
               )}
-              Activate
+              <span>Activate</span>
             </Button>
           )}
           <Button onClick={() => void save()} disabled={saving} size="sm">
@@ -155,7 +155,7 @@ export function EditorHeader() {
             ) : (
               <Save className="h-3.5 w-3.5" />
             )}
-            Save
+            <span>Save</span>
           </Button>
         </div>
       </div>

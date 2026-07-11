@@ -15,6 +15,7 @@ import type {
   UpdateContactFieldStepConfig,
   WaitStepConfig,
   CreateDealStepConfig,
+  ChangePipelineStageStepConfig,
   AssignConversationStepConfig,
 } from '@/types'
 import { supabaseAdmin } from './admin-client'
@@ -37,8 +38,16 @@ export interface AutomationContext {
   tag_id?: string
   /** Agent the conversation was assigned to, for conversation_assigned. */
   agent_id?: string
-  /** Button / list-row id the customer tapped, for interactive_reply. */
+  /** Interactive reply id, for interactive_reply. */
   interactive_reply_id?: string
+  /** Fetched contact details for variable interpolation {{contact.name}} etc */
+  contact?: {
+    name?: string | null
+    phone?: string
+    last_sale_date?: string | null
+  }
+  /** Target a specific automation id (used by cron jobs) */
+  target_automation_id?: string
 }
 
 export interface DispatchInput {
@@ -75,7 +84,7 @@ export async function runAutomationsForTrigger(input: DispatchInput): Promise<vo
     if (input.contactId) {
       const { data: owned, error: ownErr } = await db
         .from('contacts')
-        .select('id')
+        .select('id, name, phone, last_sale_date')
         .eq('id', input.contactId)
         .eq('account_id', input.accountId)
         .maybeSingle()
@@ -86,6 +95,14 @@ export async function runAutomationsForTrigger(input: DispatchInput): Promise<vo
       if (!owned) {
         console.warn('[automations] contact not in account, refusing dispatch', input.contactId)
         return
+      }
+      
+      // Inject contact into context for variable interpolation
+      input.context = input.context || {}
+      input.context.contact = {
+        name: owned.name,
+        phone: owned.phone,
+        last_sale_date: owned.last_sale_date
       }
     }
 
@@ -324,11 +341,15 @@ async function executeStepsFrom(args: ExecuteArgs): Promise<void> {
       })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      const detail = err instanceof Error 
+        ? `${msg} | Stack: ${err.stack?.slice(0, 200)} | JSON: ${JSON.stringify(err, Object.getOwnPropertyNames(err)).slice(0, 200)}` 
+        : msg
+        
       results.push({
         step_id: step.id,
         step_type: step.step_type,
         status: 'failed',
-        detail: msg,
+        detail: detail.slice(0, 255), // Max 255 chars for safety
       })
       status = 'failed'
       errorMessage = msg
@@ -551,6 +572,58 @@ async function runStep(step: AutomationStep, args: ExecuteArgs): Promise<string>
       return 'deal created'
     }
 
+    case 'change_pipeline_stage': {
+      const cfg = step.step_config as ChangePipelineStageStepConfig
+      if (!cfg.pipeline_id || !cfg.stage_id) throw new Error('change_pipeline_stage needs pipeline + stage')
+      if (!args.contactId) throw new Error('change_pipeline_stage needs a contact')
+      
+      // Encontrar o negócio aberto atual do contato, se houver
+      const { data: deals } = await db
+        .from('deals')
+        .select('id')
+        .eq('contact_id', args.contactId)
+        .eq('account_id', args.automation.account_id)
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (deals && deals.length > 0) {
+        // Atualizar o negócio existente
+        await db
+          .from('deals')
+          .update({
+            pipeline_id: cfg.pipeline_id,
+            stage_id: cfg.stage_id
+          })
+          .eq('id', deals[0].id)
+        return 'pipeline stage updated'
+      } else {
+        // Se não houver negócio, cria um novo
+        const { data: acct } = await db
+          .from('accounts')
+          .select('default_currency')
+          .eq('id', args.automation.account_id)
+          .maybeSingle()
+        
+        const title = args.context?.contact?.name 
+            ? `Deal - ${args.context.contact.name}` 
+            : `Deal - ${args.context?.contact?.phone || 'Contact'}`;
+
+        await db.from('deals').insert({
+          account_id: args.automation.account_id,
+          user_id: args.automation.user_id,
+          pipeline_id: cfg.pipeline_id,
+          stage_id: cfg.stage_id,
+          contact_id: args.contactId,
+          title: title,
+          value: 0,
+          currency: acct?.default_currency ?? 'USD',
+          status: 'open',
+        })
+        return 'deal created in new stage'
+      }
+    }
+
     case 'send_webhook': {
       const cfg = step.step_config as SendWebhookStepConfig
       if (!cfg.url) throw new Error('send_webhook needs url')
@@ -618,6 +691,10 @@ async function resolveConversationId(args: ExecuteArgs): Promise<string> {
 }
 
 export function triggerMatches(automation: Automation, ctx: AutomationContext | undefined): boolean {
+  if (ctx?.target_automation_id && ctx.target_automation_id !== automation.id) {
+    return false
+  }
+
   if (automation.trigger_type === 'keyword_match') {
     const cfg = automation.trigger_config as KeywordMatchTriggerConfig
     if (!cfg?.keywords || cfg.keywords.length === 0) return false
@@ -692,6 +769,26 @@ async function evaluateCondition(cfg: ConditionStepConfig, args: ExecuteArgs): P
       const t = parse(to)
       return f <= t ? mins >= f && mins < t : mins >= f || mins < t
     }
+    case 'pipeline_stage': {
+      if (!args.contactId || !cfg.operand) return false
+      const { data } = await db
+        .from('deals')
+        .select('pipeline_id, stage_id')
+        .eq('contact_id', args.contactId)
+        .eq('account_id', args.automation.account_id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        
+      if (!data) return false
+      if (cfg.operand === data.pipeline_id) {
+        if (cfg.value) {
+          return String(cfg.value) === String(data.stage_id)
+        }
+        return true
+      }
+      return false
+    }
     default:
       return false
   }
@@ -707,6 +804,15 @@ function interpolate(s: string, args: ExecuteArgs): string {
     const [ns, prop] = String(key).split('.')
     if (ns === 'message' && prop === 'text') return String(args.context.message_text ?? '')
     if (ns === 'vars' && prop) return String(args.context.vars?.[prop] ?? '')
+    if (ns === 'contact' && prop === 'name') return String(args.context.contact?.name ?? '')
+    if (ns === 'contact' && prop === 'phone') return String(args.context.contact?.phone ?? '')
+    if (ns === 'contact' && prop === 'last_sale_date') {
+      const rawDate = args.context.contact?.last_sale_date
+      if (!rawDate) return ''
+      const d = new Date(rawDate)
+      if (isNaN(d.getTime())) return ''
+      return d.toLocaleDateString('pt-BR')
+    }
     return ''
   })
 }

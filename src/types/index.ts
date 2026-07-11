@@ -110,6 +110,7 @@ export interface Contact {
   avatar_url?: string;
   created_at: string;
   updated_at: string;
+  birth_date?: string;
   /** Hydrated by queries that embed `contact_tags(tags(*))` (e.g. the
    *  Inbox conversation list, for tag filtering). Absent otherwise. */
   tags?: Tag[];
@@ -437,9 +438,10 @@ export type AutomationTriggerType =
   | 'conversation_assigned'
   | 'tag_added'
   | 'time_based'
-  /** Customer tapped a reply button / list row whose id matches; lets
-   *  multi-step menus be chained across automations. */
-  | 'interactive_reply';
+  | 'interactive_reply'
+  | 'pipeline_stage_changed'
+  | 'inactivity'
+  | 'birthday';
 
 export type AutomationStepType =
   | 'send_message'
@@ -451,6 +453,7 @@ export type AutomationStepType =
   | 'assign_conversation'
   | 'update_contact_field'
   | 'create_deal'
+  | 'change_pipeline_stage'
   | 'wait'
   | 'condition'
   | 'send_webhook'
@@ -479,12 +482,29 @@ export interface InteractiveReplyTriggerConfig {
   reply_ids: string[];
 }
 
+export interface PipelineStageTriggerConfig {
+  pipeline_id: string;
+  stage_id?: string; // Se omitido, dispara para qualquer etapa do funil selecionado
+}
+
+export interface InactivityTriggerConfig {
+  days: number;
+  type: 'last_purchase' | 'last_message';
+}
+
+export interface BirthdayTriggerConfig {
+  days_before?: number; // ex: 0 para o dia exato
+}
+
 export type AutomationTriggerConfig =
   | Record<string, never>
   | KeywordMatchTriggerConfig
   | TagTriggerConfig
   | TimeBasedTriggerConfig
   | InteractiveReplyTriggerConfig
+  | PipelineStageTriggerConfig
+  | InactivityTriggerConfig
+  | BirthdayTriggerConfig
   | Record<string, unknown>;
 
 export interface SendMessageStepConfig {
@@ -534,6 +554,11 @@ export interface CreateDealStepConfig {
   value?: number;
 }
 
+export interface ChangePipelineStageStepConfig {
+  pipeline_id: string;
+  stage_id: string;
+}
+
 export interface WaitStepConfig {
   amount: number;
   unit: 'minutes' | 'hours' | 'days';
@@ -543,7 +568,8 @@ export type ConditionSubject =
   | 'contact_field'
   | 'tag_presence'
   | 'message_content'
-  | 'time_of_day';
+  | 'time_of_day'
+  | 'pipeline_stage';
 
 export interface ConditionStepConfig {
   subject: ConditionSubject;
@@ -568,6 +594,7 @@ export type AutomationStepConfig =
   | AssignConversationStepConfig
   | UpdateContactFieldStepConfig
   | CreateDealStepConfig
+  | ChangePipelineStageStepConfig
   | WaitStepConfig
   | ConditionStepConfig
   | SendWebhookStepConfig
@@ -645,4 +672,58 @@ export interface QuickReply {
   interactive_payload?: InteractiveMessagePayload | null;
   created_at: string;
   updated_at: string;
+}
+
+// ============================================================
+// Products (migration 036)
+// ============================================================
+
+export interface Product {
+  id: string;
+  /** Account tenancy key — shared across all members of the account. */
+  account_id: string;
+  /** Author / audit only. */
+  user_id: string;
+  name: string;
+  description?: string;
+  sku?: string;
+  price: number;
+  unit: string; // un, kg, l, etc.
+  cost?: number;
+  stock?: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================================
+// Sales (migration 037)
+// ============================================================
+
+export interface Sale {
+  id: string;
+  /** Account tenancy key — shared across all members of the account. */
+  account_id: string;
+  /** Author / audit only. */
+  user_id: string;
+  /** Customer who made the purchase. */
+  contact_id?: string | null;
+  sale_number?: string;
+  description?: string;
+  total_value: number;
+  created_at: string;
+  updated_at: string;
+  items?: SalesItem[];
+  contact?: Contact;
+}
+
+export interface SalesItem {
+  id: string;
+  sale_id: string;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  total_value: number;
+  created_at: string;
+  product?: Product;
 }

@@ -61,7 +61,7 @@ import { NODE_META, slugify, type BuilderNode, type NodeType } from "./shared";
 export interface BuilderState {
   name: string;
   description: string;
-  trigger_type: "keyword" | "first_inbound_message" | "manual";
+  trigger_type: "keyword" | "first_inbound_message" | "manual" | "inactivity";
   trigger_config: Record<string, unknown>;
   entry_node_id: string | null;
   status: FlowRow["status"];
@@ -185,6 +185,8 @@ export function defaultConfigFor(type: NodeType): Record<string, unknown> {
       return { mode: "add", tag_id: "", next_node_key: "" };
     case "handoff":
       return { note: "" };
+    case "appointment":
+      return { service: "", employee_id: "", variable_name: "agendamento_data", next_node_key: "" };
     case "end":
       return {};
   }

@@ -15,11 +15,14 @@
     "createAccount": "Create account"
   },
   "Sidebar": {
-    "title": "CRM Template for WhatsApp",
+    "title": "Visuno",
     "dashboard": "Dashboard",
     "inbox": "Inbox",
+    "agenda": "Calendar & Shifts",
     "notifications": "Notifications",
     "contacts": "Contacts",
+    "products": "Products",
+    "productsAnalytics": "Product Analytics",
     "pipelines": "Pipelines",
     "broadcasts": "Broadcasts",
     "automations": "Automations",
@@ -45,6 +48,7 @@
     "inbox": "Inbox",
     "notifications": "Notifications",
     "contacts": "Contacts",
+    "products": "Products",
     "pipelines": "Pipelines",
     "broadcasts": "Broadcasts",
     "automations": "Automations",
@@ -831,6 +835,7 @@
         "assign_conversation": "Assign Conversation",
         "update_contact_field": "Update Contact Field",
         "create_deal": "Create Deal",
+        "change_pipeline_stage": "Change Pipeline Stage",
         "wait": "Wait",
         "condition": "Condition (If/Else)",
         "send_webhook": "Send Webhook",
@@ -868,6 +873,22 @@
         "time_based": {
           "label": "Time-Based",
           "hint": "On a recurring schedule"
+        },
+        "pipeline_stage_changed": {
+          "label": "Pipeline Stage Changed",
+          "hint": "When a contact is moved to a specific pipeline stage"
+        },
+        "inactivity": {
+          "label": "Inactivity (No Purchases/Messages)",
+          "hint": "Triggers X days after last action",
+          "baseOn": "Base inactivity on:",
+          "lastMessage": "Last Message Received",
+          "lastPurchase": "Last Purchase Made",
+          "days": "How many days?"
+        },
+        "birthday": {
+          "label": "Birthday",
+          "hint": "Triggers on the contact's birthday"
         }
       },
       "trigger": "Trigger",
@@ -930,6 +951,7 @@
         "yes": "Yes",
         "no": "No"
       },
+      "delete": "Delete",
       "addStep": "Add step",
       "config": {
         "messageText": "Message text",
@@ -957,7 +979,8 @@
           "tag_presence": "Tag presence",
           "contact_field": "Contact field",
           "message_content": "Message content",
-          "time_of_day": "Time of day"
+          "time_of_day": "Time of day",
+          "pipeline_stage": "Pipeline stage"
         },
         "operandLabel": "Operand",
         "placeholderTime": "HH:mm-HH:mm",
@@ -1159,6 +1182,10 @@
         "handoff": {
           "label": "Handoff to agent",
           "blurb": "Hands the conversation to a human"
+        },
+        "appointment": {
+          "label": "Appointment",
+          "blurb": "Offers available times and books automatically"
         },
         "end": {
           "label": "End",

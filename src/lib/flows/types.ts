@@ -177,6 +177,16 @@ export interface SetTagNodeConfig {
 export type EndNodeConfig = Record<string, never>;
 
 /**
+ * Faz a consulta na agenda e coleta os dados do usuário para salvar um agendamento.
+ */
+export interface AppointmentNodeConfig {
+  service?: string;
+  employee_id?: string | null;
+  variable_name?: string;
+  next_node_key: string;
+}
+
+/**
  * Total union — every concrete node_type the v1 engine understands.
  * Add new node types here and the engine's switch will flag missing
  * cases via TypeScript's exhaustiveness check.
@@ -194,6 +204,7 @@ export type FlowNodeConfig =
   | { node_type: "condition"; config: ConditionNodeConfig }
   | { node_type: "set_tag"; config: SetTagNodeConfig }
   | { node_type: "handoff"; config: HandoffNodeConfig }
+  | { node_type: "appointment"; config: AppointmentNodeConfig }
   | { node_type: "end"; config: EndNodeConfig };
 
 export type FlowNodeType = FlowNodeConfig["node_type"];

@@ -107,6 +107,7 @@ const STEP_META: Record<AutomationStepType, StepMeta> = {
   assign_conversation: { label: "assign_conversation", icon: UserCheck, border: "border-l-primary" },
   update_contact_field: { label: "update_contact_field", icon: PencilLine, border: "border-l-primary" },
   create_deal: { label: "create_deal", icon: Briefcase, border: "border-l-primary" },
+  change_pipeline_stage: { label: "change_pipeline_stage", icon: GitBranch, border: "border-l-primary" },
   wait: { label: "wait", icon: Hourglass, border: "border-l-border" },
   condition: { label: "condition", icon: GitBranch, border: "border-l-amber-500" },
   send_webhook: { label: "send_webhook", icon: Webhook, border: "border-l-primary" },
@@ -123,6 +124,7 @@ const ADDABLE_STEPS: AutomationStepType[] = [
   "assign_conversation",
   "update_contact_field",
   "create_deal",
+  "change_pipeline_stage",
   "wait",
   "condition",
   "send_webhook",
@@ -138,6 +140,9 @@ const TRIGGER_OPTIONS: { value: AutomationTriggerType }[] = [
   { value: "conversation_assigned" },
   { value: "tag_added" },
   { value: "time_based" },
+  { value: "pipeline_stage_changed" },
+  { value: "inactivity" },
+  { value: "birthday" },
 ]
 
 function cid(): string {
@@ -180,6 +185,8 @@ function blankConfig(type: AutomationStepType): Record<string, unknown> {
       return { field: "name", value: "" }
     case "create_deal":
       return { pipeline_id: "", stage_id: "", title: "", value: 0 }
+    case "change_pipeline_stage":
+      return { pipeline_id: "", stage_id: "" }
     case "wait":
       return { amount: 1, unit: "hours" }
     case "condition":
@@ -860,6 +867,35 @@ function TriggerCard({
                 />
               </div>
             )}
+            {type === "inactivity" && (
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                    {t("triggers.inactivity.baseOn")}
+                  </label>
+                  <select
+                    value={(config.type as string) ?? "last_message"}
+                    onChange={(e) => onConfigChange({ ...config, type: e.target.value })}
+                    className="w-full rounded-md border border-border bg-muted px-2 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none"
+                  >
+                    <option value="last_message">{t("triggers.inactivity.lastMessage")}</option>
+                    <option value="last_purchase">{t("triggers.inactivity.lastPurchase")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                    {t("triggers.inactivity.days")}
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={(config.days as number) ?? 1}
+                    onChange={(e) => onConfigChange({ ...config, days: Number(e.target.value) })}
+                    className="bg-muted text-foreground"
+                  />
+                </div>
+              </div>
+            )}
             {type === "time_based" && (
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted-foreground">
@@ -1268,6 +1304,30 @@ function AddButton({ onPick }: { onPick: (t: AutomationStepType) => void }) {
 // Per-step config editor
 // ------------------------------------------------------------
 
+function VariableSelector({ onSelect }: { onSelect: (v: string) => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        title="Inserir Variável"
+        className="ml-auto flex items-center gap-1 rounded bg-muted/50 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <span className="font-mono text-[10px]">{`{ }`}</span> Variáveis
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem onClick={() => onSelect("{{contact.name}}")}>
+          Nome do Contato
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onSelect("{{contact.phone}}")}>
+          Telefone do Contato
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onSelect("{{contact.last_sale_date}}")}>
+          Data da Última Compra
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 function StepEditor({
   step,
   onChange,
@@ -1283,14 +1343,23 @@ function StepEditor({
   switch (step.step_type) {
     case "send_message":
       return (
-        <FieldBlock label={t("config.messageText")}>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-foreground">
+              {t("config.messageText")}
+            </label>
+            <VariableSelector onSelect={(v) => {
+              const current = (cfg.text as string) || "";
+              set({ text: current + (current.endsWith(" ") || !current ? "" : " ") + v })
+            }} />
+          </div>
           <Textarea
             value={(cfg.text as string) ?? ""}
             onChange={(e) => set({ text: e.target.value })}
             placeholder={t("config.placeholderMessageText")}
             className="min-h-24 bg-muted text-foreground"
           />
-        </FieldBlock>
+        </div>
       )
     case "send_buttons":
     case "send_list":
@@ -1302,6 +1371,10 @@ function StepEditor({
           onChange={(payload) =>
             onChange({ ...step, step_config: toStepConfig(payload) })
           }
+          showPreview={false}
+          renderVariableSelector={(onSelect) => (
+            <VariableSelector onSelect={onSelect} />
+          )}
         />
       )
     case "send_template":
@@ -1394,6 +1467,15 @@ function StepEditor({
           </FieldBlock>
         </>
       )
+    case "change_pipeline_stage":
+      return (
+        <DealPipelineFields
+          pipelineId={(cfg.pipeline_id as string) ?? ""}
+          stageId={(cfg.stage_id as string) ?? ""}
+          onChange={(patch) => set(patch)}
+          t={t}
+        />
+      )
     case "wait":
       return (
         <div className="grid grid-cols-2 gap-2">
@@ -1432,24 +1514,34 @@ function StepEditor({
               <option value="contact_field">{t("config.subjects.contact_field")}</option>
               <option value="message_content">{t("config.subjects.message_content")}</option>
               <option value="time_of_day">{t("config.subjects.time_of_day")}</option>
+              <option value="pipeline_stage">{t("config.subjects.pipeline_stage")}</option>
             </select>
           </FieldBlock>
-          <FieldBlock label={t("config.operandLabel")}>
-            <Input
-              placeholder={
-                cfg.subject === "time_of_day"
-                  ? t("config.placeholderTime")
-                  : cfg.subject === "contact_field"
-                  ? t("config.placeholderContact")
-                  : cfg.subject === "tag_presence"
-                  ? t("config.placeholderTag")
-                  : ""
-              }
-              value={(cfg.operand as string) ?? ""}
-              onChange={(e) => set({ operand: e.target.value })}
-              className="bg-muted text-foreground"
+          {cfg.subject === "pipeline_stage" ? (
+            <DealPipelineFields
+              pipelineId={(cfg.operand as string) ?? ""}
+              stageId={(cfg.value as string) ?? ""}
+              onChange={(patch) => set({ operand: patch.pipeline_id, value: patch.stage_id })}
+              t={t}
             />
-          </FieldBlock>
+          ) : (
+            <FieldBlock label={t("config.operandLabel")}>
+              <Input
+                placeholder={
+                  cfg.subject === "time_of_day"
+                    ? t("config.placeholderTime")
+                    : cfg.subject === "contact_field"
+                    ? t("config.placeholderContact")
+                    : cfg.subject === "tag_presence"
+                    ? t("config.placeholderTag")
+                    : ""
+                }
+                value={(cfg.operand as string) ?? ""}
+                onChange={(e) => set({ operand: e.target.value })}
+                className="bg-muted text-foreground"
+              />
+            </FieldBlock>
+          )}
           {(cfg.subject === "contact_field" || cfg.subject === "message_content") && (
             <FieldBlock label="Value">
               <Input

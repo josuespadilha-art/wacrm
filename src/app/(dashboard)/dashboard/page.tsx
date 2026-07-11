@@ -9,6 +9,11 @@ import {
   UserPlus,
   DollarSign,
   Send,
+  Wallet,
+  UserCheck,
+  TriangleAlert,
+  RotateCcw,
+  Cake
 } from 'lucide-react'
 
 import {
@@ -138,51 +143,34 @@ export default function DashboardPage() {
         ) : (
           <>
             <MetricCard
-              title={t('activeConversations')}
-              value={metrics.activeConversations.current.toLocaleString()}
-              icon={MessageSquare}
+              title="Receita Recuperada Hoje"
+              value={formatCurrency(metrics.todaySalesRevenue.current, defaultCurrency)}
+              icon={Wallet}
               delta={{
-                sign: metrics.activeConversations.previous,
-                label: deltaLabel(
-                  metrics.activeConversations.previous, 
-                  t('newTodayVsYesterday'), 
-                  t('noChange', { suffix: t('newTodayVsYesterday') })
-                ),
+                sign: Math.sign(metrics.todaySalesRevenue.current - metrics.todaySalesRevenue.previous),
+                label: `vs ontem`,
               }}
             />
             <MetricCard
-              title={t('newContactsToday')}
-              value={metrics.newContactsToday.current.toLocaleString()}
-              icon={UserPlus}
+              title="Vendas Realizadas"
+              value={metrics.todaySalesCount.current.toString()}
+              icon={UserCheck}
               delta={{
-                sign:
-                  metrics.newContactsToday.current - metrics.newContactsToday.previous,
-                label: deltaLabel(
-                  metrics.newContactsToday.current - metrics.newContactsToday.previous,
-                  t('vsYesterday'),
-                  t('noChange', { suffix: t('vsYesterday') })
-                ),
+                sign: Math.sign(metrics.todaySalesCount.current - metrics.todaySalesCount.previous),
+                label: `vs ontem`,
               }}
             />
             <MetricCard
-              title={t('openDealsValue')}
+              title="Valor Previsto (Pipeline)"
               value={formatCurrency(metrics.openDealsValue, defaultCurrency)}
               icon={DollarSign}
               subtitle={t('openDeals', { count: metrics.openDealsCount })}
             />
             <MetricCard
-              title={t('messagesSentToday')}
+              title="Mensagens Enviadas"
               value={metrics.messagesSentToday.current.toLocaleString()}
               icon={Send}
-              delta={{
-                sign:
-                  metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
-                label: deltaLabel(
-                  metrics.messagesSentToday.current - metrics.messagesSentToday.previous,
-                  t('vsYesterday'),
-                  t('noChange', { suffix: t('vsYesterday') })
-                ),
-              }}
+              subtitle="Automações ativas hoje"
             />
           </>
         )}
@@ -190,6 +178,62 @@ export default function DashboardPage() {
 
       {/* Quick actions */}
       <QuickActions />
+
+      {/* Oportunidades (Visuno) */}
+      <div className="mt-2 mb-2">
+        <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
+          Oportunidades de Hoje
+        </h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {/* Risco */}
+          <div className="flex items-center justify-between p-4 rounded-xl border border-red-500/20 bg-red-500/5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/10 text-red-500">
+                <TriangleAlert className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-lg font-bold text-foreground">
+                  {metricsLoading || !metrics ? '-' : metrics.contactsAtRiskCount}
+                </h4>
+                <p className="text-xs text-muted-foreground">Clientes em risco de sumir</p>
+              </div>
+            </div>
+            <button className="text-xs font-medium text-muted-foreground hover:text-foreground">Agir agora &rarr;</button>
+          </div>
+
+          {/* Reativar */}
+          <div className="flex items-center justify-between p-4 rounded-xl border border-amber-500/20 bg-amber-500/5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10 text-amber-500">
+                <RotateCcw className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-lg font-bold text-foreground">
+                  {metricsLoading || !metrics ? '-' : metrics.contactsToReactivateCount}
+                </h4>
+                <p className="text-xs text-muted-foreground">Para reativar hoje</p>
+              </div>
+            </div>
+            <button className="text-xs font-medium text-muted-foreground hover:text-foreground">Prontos &rarr;</button>
+          </div>
+
+          {/* Novos Leads */}
+          <div className="flex items-center justify-between p-4 rounded-xl border border-[#6D5EF8]/20 bg-[#6D5EF8]/5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#6D5EF8]/10 text-[#6D5EF8]">
+                <UserPlus className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-lg font-bold text-foreground">
+                  {metricsLoading || !metrics ? '-' : metrics.newContactsToday.current}
+                </h4>
+                <p className="text-xs text-muted-foreground">Novos Leads Hoje</p>
+              </div>
+            </div>
+            <button className="text-xs font-medium text-muted-foreground hover:text-foreground">Ver leads &rarr;</button>
+          </div>
+        </div>
+      </div>
 
       {/* Charts row */}
       {/* items-stretch (the grid default) stretches the two columns to

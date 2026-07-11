@@ -1,8 +1,10 @@
 import { getRequestConfig } from 'next-intl/server';
+import { cookies } from 'next/headers';
 
 export default getRequestConfig(async () => {
   // Read the locale from the environment, defaulting to 'en'
-  const locale = process.env.NEXT_PUBLIC_APP_LOCALE || 'en';
+  const cookieStore = await cookies();
+  const locale = cookieStore.get('APP_LOCALE')?.value || process.env.NEXT_PUBLIC_APP_LOCALE || 'en';
 
   let messages;
   try {

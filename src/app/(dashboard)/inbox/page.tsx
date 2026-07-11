@@ -8,11 +8,12 @@ import {
   CONVERSATION_SELECT,
   normalizeConversation,
 } from "@/lib/inbox/conversations";
-import type { Conversation, Message, Contact, ConversationStatus } from "@/types";
+import type { Conversation, Message, Contact, ConversationStatus, Product } from "@/types";
 import { useRealtime } from "@/hooks/use-realtime";
 import { ConversationList } from "@/components/inbox/conversation-list";
 import { MessageThread } from "@/components/inbox/message-thread";
 import { ContactSidebar } from "@/components/inbox/contact-sidebar";
+import { CreateSaleForm } from "@/components/products/create-sale-form";
 import { toast } from "sonner";
 import { WifiOff } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -58,6 +59,10 @@ export default function InboxPage() {
    * below reconciles to the stored value right after mount instead.
    */
   const [contactPanelOpen, setContactPanelOpen] = useState(true);
+  const [saleFormOpen, setSaleFormOpen] = useState(false);
+  const [savingSale, setSavingSale] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  
   useEffect(() => {
     try {
       const stored = localStorage.getItem(CONTACT_PANEL_STORAGE_KEY);
@@ -160,6 +165,119 @@ export default function InboxPage() {
       hydratingConvIdsRef.current.delete(convId);
     }
   }, []);
+
+  // Fetch products on mount
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("active", true)
+        .order("name");
+
+      if (!error && data) {
+        setProducts(data);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  const handleOpenSaleForm = useCallback(() => {
+    setSaleFormOpen(true);
+  }, []);
+
+  const handleSaveSale = useCallback(
+    async (saleData: {
+      sale_number?: string;
+      description?: string;
+      contact_id?: string;
+      items: Array<{
+        product_id: string;
+        quantity: number;
+        unit_price: number;
+      }>;
+      total_value: number;
+    }) => {
+      setSavingSale(true);
+      try {
+        const supabase = createClient();
+
+        // Create sale
+        const { data: saleDataRes, error: saleError } = await supabase
+          .from("sales")
+          .insert([
+            {
+              sale_number: saleData.sale_number,
+              description: saleData.description,
+              contact_id: saleData.contact_id,
+              total_value: saleData.total_value,
+            },
+          ])
+          .select()
+          .single();
+
+        if (saleError) throw saleError;
+
+        // Create sale items
+        const saleItems = saleData.items.map((item) => ({
+          sale_id: saleDataRes.id,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_value: item.quantity * item.unit_price,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from("sales_items")
+          .insert(saleItems);
+
+        if (itemsError) throw itemsError;
+
+        toast.success("Venda registrada com sucesso");
+        setSaleFormOpen(false);
+      } catch (error: any) {
+        console.error("Error saving sale:", error);
+        toast.error(error.message || "Erro ao registrar venda");
+      } finally {
+        setSavingSale(false);
+      }
+    },
+    []
+  );
+
+  const handleRegisterPurchase = useCallback(
+    async (selectedProducts: Array<{ product_id: string; quantity: number }>) => {
+      if (!activeContact) {
+        toast.error("Nenhum contato selecionado");
+        return;
+      }
+
+      // Convert selected products to sale items format
+      const items = selectedProducts.map((sp) => {
+        const product = products.find((p) => p.id === sp.product_id);
+        return {
+          product_id: sp.product_id,
+          quantity: sp.quantity,
+          unit_price: product?.price || 0,
+        };
+      });
+
+      const totalValue = items.reduce(
+        (sum, item) => sum + item.quantity * item.unit_price,
+        0
+      );
+
+      // Call handleSaveSale with the formatted data
+      await handleSaveSale({
+        contact_id: activeContact.id,
+        items,
+        total_value: totalValue,
+      });
+    },
+    [activeContact, products, handleSaveSale]
+  );
 
   // Check WhatsApp connection status on mount
   useEffect(() => {
@@ -621,10 +739,24 @@ export default function InboxPage() {
             toggle — which is itself desktop-only — never affects it. */}
         {contactPanelOpen && (
           <div className="hidden lg:block">
-            <ContactSidebar contact={activeContact} />
+            <ContactSidebar
+              contact={activeContact}
+              products={products}
+              onRegisterPurchase={handleRegisterPurchase}
+              isRegistringPurchase={savingSale}
+            />
           </div>
         )}
       </div>
+
+      <CreateSaleForm
+        open={saleFormOpen}
+        onOpenChange={setSaleFormOpen}
+        products={products}
+        contactId={activeContact?.id}
+        onSubmit={handleSaveSale}
+        isLoading={savingSale}
+      />
     </div>
   );
 }

@@ -37,7 +37,7 @@ export interface ValidationIssue {
 
 interface FlowInput {
   name: string;
-  trigger_type: "keyword" | "first_inbound_message" | "manual";
+  trigger_type: "keyword" | "first_inbound_message" | "manual" | "inactivity";
   trigger_config: Record<string, unknown>;
   entry_node_id: string | null;
 }
@@ -171,6 +171,18 @@ function validateTrigger(
           message: `${blanks} keyword${blanks === 1 ? " is" : "s are"} blank — they won't match anything.`,
         });
       }
+    }
+  }
+
+  if (trigger_type === "inactivity") {
+    const amount = typeof trigger_config.amount === "number" ? trigger_config.amount : 0;
+    if (amount < 1) {
+      issues.push({
+        severity: "error",
+        scope: "trigger",
+        field: "trigger_config.amount",
+        message: "O tempo de inatividade deve ser no mínimo 1.",
+      });
     }
   }
   // first_inbound_message / manual have no config; nothing to validate.
@@ -701,6 +713,28 @@ function validateNode(
       break;
     }
 
+    case "appointment": {
+      const cfg = node.config as { next_node_key?: string };
+      if (!cfg.next_node_key) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "next_node_key",
+          message: "Appointment node must point to a next node.",
+        });
+      } else if (!knownKeys.has(cfg.next_node_key)) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "next_node_key",
+          message: `Appointment points to non-existent node "${cfg.next_node_key}".`,
+        });
+      }
+      break;
+    }
+
     case "handoff":
     case "end":
       // Terminal nodes have no outgoing edges; nothing to validate
@@ -751,7 +785,8 @@ function outgoingEdges(node: NodeInput): string[] {
     case "send_message":
     case "send_media":
     case "collect_input":
-    case "set_tag": {
+    case "set_tag":
+    case "appointment": {
       const cfg = node.config as { next_node_key?: string };
       return cfg.next_node_key ? [cfg.next_node_key] : [];
     }

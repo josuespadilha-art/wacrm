@@ -1,12 +1,19 @@
 "use client";
 
-import { Check, Moon, Palette, SunMoon, Sun } from "lucide-react";
+import { Check, Moon, Palette, SunMoon, Sun, Globe } from "lucide-react";
 
 import { useTheme } from "@/hooks/use-theme";
 import { MODES, THEMES, type Mode, type ThemeId } from "@/lib/themes";
 import { cn } from "@/lib/utils";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { SettingsPanelHead } from "./settings-panel-head";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 /**
  * Appearance panel — light/dark mode + accent-color picker.
@@ -23,6 +30,13 @@ import { SettingsPanelHead } from "./settings-panel-head";
 export function AppearancePanel() {
   const { theme, setTheme, mode, setMode } = useTheme();
   const t = useTranslations("Settings.appearance");
+  const locale = useLocale();
+
+  const handleLanguageChange = (newLocale: string | null) => {
+    if (!newLocale) return;
+    document.cookie = `APP_LOCALE=${newLocale}; path=/; max-age=31536000`;
+    window.location.reload();
+  };
 
   return (
     <section className="max-w-3xl animate-in fade-in-50 duration-200">
@@ -32,6 +46,25 @@ export function AppearancePanel() {
       />
 
       <div className="space-y-4">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Globe className="size-4 text-muted-foreground" />
+          Idioma / Language
+        </h3>
+        
+        <div className="max-w-[250px]">
+          <Select value={locale} onValueChange={handleLanguageChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o Idioma" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pt-BR">Português (Brasil)</SelectItem>
+              <SelectItem value="en">English (US)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="mt-8 space-y-4">
         <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <SunMoon className="size-4 text-muted-foreground" />
           {t("mode")}

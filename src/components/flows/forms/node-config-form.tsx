@@ -205,6 +205,36 @@ export function NodeConfigForm({
         />
       );
 
+      case "appointment":
+        return (
+          <>
+            <div className="mb-4 text-xs text-muted-foreground">
+              Este bloco consulta a agenda automaticamente, oferece os dias e horários para o cliente pelo WhatsApp e salva o agendamento no banco de dados.
+            </div>
+            <TextRow
+              label="Serviço ou Anotação (Opcional)"
+              value={(cfg as any).service ?? ""}
+              onChange={(v) => onUpdateConfig({ service: v })}
+            />
+            <div className="mb-4">
+              <label className="mb-1 block text-xs text-muted-foreground">Forçar Funcionário (Opcional)</label>
+              <Input
+                value={(cfg as any).employee_id ?? ""}
+                onChange={(e) => onUpdateConfig({ employee_id: e.target.value })}
+                placeholder="ID do funcionário ou deixe vazio para listar todos"
+                className="bg-muted text-xs"
+              />
+            </div>
+            <NextNodeRow
+              value={(cfg as { next_node_key?: string }).next_node_key ?? ""}
+              allNodes={allNodes}
+              currentKey={node.node_key}
+              onChange={(v) => onUpdateConfig({ next_node_key: v })}
+              label={t("advancesTo")}
+            />
+          </>
+        );
+
     case "end":
       return (
         <p className="text-xs text-muted-foreground">
