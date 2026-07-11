@@ -372,9 +372,9 @@ async function sendButtonsAndSuspend(
     userId: run.user_id,
     conversationId: run.conversation_id!,
     contactId: run.contact_id!,
-    bodyText: cfg.text,
-    headerText: cfg.header_text,
-    footerText: cfg.footer_text,
+    bodyText: cfg.text ? interpolateVars(cfg.text, run.vars) : "",
+    headerText: cfg.header_text ? interpolateVars(cfg.header_text, run.vars) : undefined,
+    footerText: cfg.footer_text ? interpolateVars(cfg.footer_text, run.vars) : undefined,
     buttons: cfg.buttons.map((b) => ({ id: b.reply_id, title: b.title })),
   });
   await logEvent(db, run.id, "message_sent", node.node_key, {
@@ -408,10 +408,10 @@ async function sendListAndSuspend(
     userId: run.user_id,
     conversationId: run.conversation_id!,
     contactId: run.contact_id!,
-    bodyText: cfg.text,
+    bodyText: cfg.text ? interpolateVars(cfg.text, run.vars) : "",
     buttonLabel: cfg.button_label,
-    headerText: cfg.header_text,
-    footerText: cfg.footer_text,
+    headerText: cfg.header_text ? interpolateVars(cfg.header_text, run.vars) : undefined,
+    footerText: cfg.footer_text ? interpolateVars(cfg.footer_text, run.vars) : undefined,
     sections: cfg.sections.map((s) => ({
       title: s.title,
       rows: s.rows.map((r) => ({
@@ -459,8 +459,9 @@ async function sendAppointmentListAndSuspend(
     .in("status", ["scheduled"]);
 
   const nowMs = Date.now();
-  // Fuso horário de São Paulo (UTC-3)
-  const brMs = nowMs - (3 * 3600 * 1000);
+  // Fuso horário local (UTC-4)
+  const tzOffset = 4;
+  const brMs = nowMs - (tzOffset * 3600 * 1000);
   const brNow = new Date(brMs);
   const pad = (n: number) => n.toString().padStart(2, '0');
   
@@ -469,7 +470,7 @@ async function sendAppointmentListAndSuspend(
   // Gerar slots para os próximos 7 dias
   for (let i = 0; i < 7; i++) {
     const brMidnight = new Date(Date.UTC(brNow.getUTCFullYear(), brNow.getUTCMonth(), brNow.getUTCDate() + i));
-    const dayOfWeek = brMidnight.getUTCDay(); // 0 = Dom, 1 = Seg... (no BRT)
+    const dayOfWeek = brMidnight.getUTCDay(); // 0 = Dom, 1 = Seg... no fuso
     
     const dayConfig = opHours?.find((h: any) => h.day_of_week === dayOfWeek);
     if (!dayConfig || dayConfig.is_closed) continue;
@@ -477,8 +478,8 @@ async function sendAppointmentListAndSuspend(
     const [openH, openM] = dayConfig.open_time.split(':').map(Number);
     const [closeH, closeM] = dayConfig.close_time.split(':').map(Number);
     
-    let currentSlot = new Date(Date.UTC(brMidnight.getUTCFullYear(), brMidnight.getUTCMonth(), brMidnight.getUTCDate(), openH + 3, openM));
-    const endTime = new Date(Date.UTC(brMidnight.getUTCFullYear(), brMidnight.getUTCMonth(), brMidnight.getUTCDate(), closeH + 3, closeM));
+    let currentSlot = new Date(Date.UTC(brMidnight.getUTCFullYear(), brMidnight.getUTCMonth(), brMidnight.getUTCDate(), openH + tzOffset, openM));
+    const endTime = new Date(Date.UTC(brMidnight.getUTCFullYear(), brMidnight.getUTCMonth(), brMidnight.getUTCDate(), closeH + tzOffset, closeM));
 
     while (currentSlot.getTime() + 30 * 60 * 1000 <= endTime.getTime()) {
       if (currentSlot.getTime() > nowMs) {
@@ -490,7 +491,7 @@ async function sendAppointmentListAndSuspend(
         });
 
         if (!isOverlap && slots.length < 10) {
-          const d = new Date(currentSlot.getTime() - 3 * 3600 * 1000);
+          const d = new Date(currentSlot.getTime() - tzOffset * 3600 * 1000);
           slots.push({
             id: currentSlot.toISOString(),
             title: `${pad(d.getUTCDate())}/${pad(d.getUTCMonth()+1)} - ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`,
@@ -632,7 +633,7 @@ async function evaluateConditionNode(
  */
 function interpolateVars(template: string, vars: Record<string, unknown>): string {
   if (!template) return "";
-  return template.replace(/\{\{(?:vars\.)?([a-zA-Z0-9_]+)\}\}/g, (_, key) => {
+  return template.replace(/\{\{\s*(?:vars\.)?([a-zA-Z0-9_.]+)\s*\}\}/g, (_, key) => {
     const v = vars[key];
     return v === undefined || v === null ? "" : String(v);
   });
@@ -1273,6 +1274,19 @@ async function startNewRun(
   input: DispatchInboundInput,
   nodes: Map<string, FlowNodeRow>,
 ): Promise<DispatchInboundResult> {
+  // Busca o nome do contato para injetar em vars['contact.name']
+  const { data: contactData } = await db
+    .from("contacts")
+    .select("name, phone")
+    .eq("id", input.contactId)
+    .maybeSingle();
+
+  const initialVars: Record<string, unknown> = {};
+  if (contactData) {
+    if (contactData.name) initialVars['contact.name'] = contactData.name;
+    if (contactData.phone) initialVars['contact.phone'] = contactData.phone;
+  }
+
   // INSERT — partial unique index `idx_one_active_run_per_contact`
   // catches concurrent inserts with 23505. We catch and return as
   // consumed:true (the parallel webhook handles it).
@@ -1292,6 +1306,7 @@ async function startNewRun(
       conversation_id: input.conversationId,
       status: "active",
       current_node_key: flow.entry_node_id,
+      vars: initialVars,
     })
     .select("*")
     .maybeSingle();
