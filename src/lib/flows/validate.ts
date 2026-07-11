@@ -826,8 +826,6 @@ function outgoingEdges(node: NodeInput): string[] {
       if (cfg.timeout_node_key) out.push(cfg.timeout_node_key);
       return out;
     }
-      return cfg.next_node_key ? [cfg.next_node_key] : [];
-    }
     case "condition": {
       const cfg = node.config as {
         true_next?: string;
