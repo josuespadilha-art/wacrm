@@ -896,6 +896,55 @@ async function advanceFromNodeKey(
       }
       return { outcome: "advanced" };
     }
+    if (node.node_type === "change_pipeline_stage") {
+      const cfg = node.config as any;
+      if (run.contact_id && cfg.pipeline_id && cfg.stage_id) {
+        try {
+          const { data: deals } = await db
+            .from("deals")
+            .select("id")
+            .eq("contact_id", run.contact_id)
+            .eq("account_id", run.account_id)
+            .eq("status", "open")
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+          if (deals && deals.length > 0) {
+            await db
+              .from("deals")
+              .update({
+                pipeline_id: cfg.pipeline_id,
+                stage_id: cfg.stage_id,
+              })
+              .eq("id", deals[0].id);
+          } else {
+            const { data: acct } = await db
+              .from("accounts")
+              .select("default_currency")
+              .eq("id", run.account_id)
+              .maybeSingle();
+
+            await db.from("deals").insert({
+              account_id: run.account_id,
+              contact_id: run.contact_id,
+              pipeline_id: cfg.pipeline_id,
+              stage_id: cfg.stage_id,
+              title: "Negócio Automático",
+              value: 0,
+              currency: acct?.default_currency ?? "BRL",
+              status: "open",
+            });
+          }
+        } catch (err) {
+          await logEvent(db, run.id, "error", node.node_key, {
+            reason: "change_pipeline_stage_failed",
+            detail: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+      currentKey = cfg.next_node_key;
+      continue;
+    }
     if (node.node_type === "appointment") {
       await sendAppointmentListAndSuspend(db, run, node);
       const advanced = await advanceCurrentNodeKey(

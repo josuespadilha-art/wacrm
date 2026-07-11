@@ -241,6 +241,26 @@ export function NodeConfigForm({
           </>
         );
 
+      case "change_pipeline_stage":
+        return (
+          <>
+            <div className="mb-4 text-xs text-muted-foreground">
+              Move o lead para uma etapa específica de um funil de vendas. Se o lead não tiver um negócio aberto neste funil, um novo será criado automaticamente.
+            </div>
+            <PipelineConfigFields
+              pipelineId={(cfg as any).pipeline_id ?? ""}
+              stageId={(cfg as any).stage_id ?? ""}
+              onChange={(patch) => onUpdateConfig(patch)}
+            />
+            <NextNodeRow
+              value={(cfg as { next_node_key?: string }).next_node_key ?? ""}
+              allNodes={allNodes}
+              currentKey={node.node_key}
+              onChange={(v) => onUpdateConfig({ next_node_key: v })}
+              label={t("advancesTo")}
+            />
+          </>
+        );
     case "end":
       return (
         <p className="text-xs text-muted-foreground">
@@ -1145,6 +1165,77 @@ function SendMediaForm({
         onChange={(v) => onUpdateConfig({ next_node_key: v })}
         label={t("advanceAfterSending")}
       />
+    </>
+  );
+}
+
+function PipelineConfigFields({
+  pipelineId,
+  stageId,
+  onChange,
+}: {
+  pipelineId: string;
+  stageId: string;
+  onChange: (patch: { pipeline_id?: string; stage_id?: string }) => void;
+}) {
+  const [pipelines, setPipelines] = useState<any[]>([]);
+  const [stages, setStages] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function load() {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const [{ data: p }, { data: s }] = await Promise.all([
+        supabase.from("pipelines").select("*").order("created_at"),
+        supabase.from("pipeline_stages").select("*").order("position"),
+      ]);
+      if (p) setPipelines(p);
+      if (s) setStages(s);
+    }
+    load();
+  }, []);
+
+  const stageOptions = stages.filter((s) => s.pipeline_id === pipelineId);
+
+  return (
+    <>
+      <div className="mb-4">
+        <label className="mb-1 block text-xs text-muted-foreground">Funil (Pipeline)</label>
+        <Select
+          value={pipelineId || undefined}
+          onValueChange={(val) => onChange({ pipeline_id: val, stage_id: "" })}
+        >
+          <SelectTrigger className="bg-muted text-xs">
+            <SelectValue placeholder="Selecione um funil" />
+          </SelectTrigger>
+          <SelectContent>
+            {pipelines.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="mb-4">
+        <label className="mb-1 block text-xs text-muted-foreground">Etapa do Funil</label>
+        <Select
+          value={stageId || undefined}
+          onValueChange={(val) => onChange({ stage_id: val })}
+          disabled={!pipelineId || stageOptions.length === 0}
+        >
+          <SelectTrigger className="bg-muted text-xs">
+            <SelectValue placeholder="Selecione a etapa" />
+          </SelectTrigger>
+          <SelectContent>
+            {stageOptions.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </>
   );
 }

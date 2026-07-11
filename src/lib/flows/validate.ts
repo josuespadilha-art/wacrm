@@ -735,6 +735,37 @@ function validateNode(
       break;
     }
 
+    case "change_pipeline_stage": {
+      const cfg = node.config as { pipeline_id?: string; stage_id?: string; next_node_key?: string };
+      if (!cfg.pipeline_id || !cfg.stage_id) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "pipeline_id",
+          message: "Mover no Funil precisa de um funil e uma etapa selecionados.",
+        });
+      }
+      if (!cfg.next_node_key) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "next_node_key",
+          message: "Mover no Funil deve apontar para um próximo nó.",
+        });
+      } else if (!knownKeys.has(cfg.next_node_key)) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "next_node_key",
+          message: `Mover no Funil aponta para nó inexistente "${cfg.next_node_key}".`,
+        });
+      }
+      break;
+    }
+
     case "handoff":
     case "end":
       // Terminal nodes have no outgoing edges; nothing to validate
@@ -814,7 +845,8 @@ function outgoingEdges(node: NodeInput): string[] {
     case "start":
     case "send_message":
     case "send_media":
-    case "set_tag": {
+    case "set_tag":
+    case "change_pipeline_stage": {
       const cfg = node.config as { next_node_key?: string };
       return cfg.next_node_key ? [cfg.next_node_key] : [];
     }

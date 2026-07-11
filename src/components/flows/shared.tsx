@@ -29,6 +29,7 @@ import {
   Tag,
   UserPlus,
   Workflow,
+  Briefcase,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -52,6 +53,7 @@ export type NodeType =
   | 'set_tag'
   | 'handoff'
   | 'appointment'
+  | 'change_pipeline_stage'
   | 'end';
 
 export interface BuilderNode {
@@ -79,12 +81,13 @@ export interface BuilderNode {
 // the canvas, so `start` is just the entry point under Flow control.
 // ------------------------------------------------------------
 
-export type NodeCategory = 'messaging' | 'logic' | 'flow';
+export type NodeCategory = 'messaging' | 'logic' | 'flow' | 'crm';
 
 /** Category labels + the order they render in the add-step menu. */
 export const NODE_CATEGORIES: { id: NodeCategory; label: string }[] = [
   { id: 'messaging', label: 'Messaging' },
   { id: 'logic', label: 'Logic & data' },
+  { id: 'crm', label: 'CRM Actions' },
   { id: 'flow', label: 'Flow control' },
 ];
 
@@ -174,6 +177,13 @@ export const NODE_META: Record<
     color: 'text-muted-foreground',
     blurb: 'Ends the flow',
     category: 'flow',
+  },
+  change_pipeline_stage: {
+    label: 'Mover no Funil',
+    icon: Briefcase,
+    color: 'text-amber-600',
+    blurb: 'Move ou cria lead numa etapa do funil',
+    category: 'crm',
   },
 };
 
@@ -327,6 +337,9 @@ export function summarizeNode(
     case 'appointment': {
       const svc = (cfg as any).service;
       return svc ? `Agendar: ${truncate(svc, 30)}` : 'Oferecer opções de horário';
+    }
+    case 'change_pipeline_stage': {
+      return 'Mover lead no funil';
     }
     case 'send_message': {
       const text = typeof cfg.text === 'string' ? cfg.text : '';
