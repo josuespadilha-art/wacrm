@@ -1000,13 +1000,8 @@ async function findOrCreateContact(
   )
 
   if (existingContact) {
-    // Update name if it changed
-    if (name && name !== existingContact.name) {
-      await supabaseAdmin()
-        .from('contacts')
-        .update({ name, updated_at: new Date().toISOString() })
-        .eq('id', existingContact.id)
-    }
+    // Não sobrescrevemos o nome com o perfil do WhatsApp para preservar
+    // nomes capturados pelo fluxo ou editados manualmente no CRM.
     return { contact: existingContact, wasCreated: false }
   }
 
