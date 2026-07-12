@@ -1295,30 +1295,40 @@ async function handleReplyForActiveRun(
         });
         
         // Atualiza o contato no banco de dados se a variável for contact.name ou contact.phone
-        if (cfg.var_key === "contact.name") {
-          const { error: nameUpdateErr } = await db
-            .from("contacts")
-            .update({ name: captured })
-            .eq("id", run.contact_id!);
-          
-          if (nameUpdateErr) {
+        if (cfg.var_key === "contact.name" && run.contact_id) {
+          try {
+            const { error: nameUpdateErr, data: nameData } = await db
+              .from("contacts")
+              .update({ name: captured })
+              .eq("id", run.contact_id)
+              .select("id, name");
+            
+            if (nameUpdateErr) {
+              await logEvent(db, run.id, "error", currentNode.node_key, {
+                reason: "contact_name_update_failed",
+                detail: nameUpdateErr.message,
+                code: nameUpdateErr.code,
+                contact_id: run.contact_id,
+              });
+            }
+            // se nameData estiver vazio, o contact_id não bateu com nenhum registro
+            if (!nameData || nameData.length === 0) {
+              await logEvent(db, run.id, "error", currentNode.node_key, {
+                reason: "contact_name_update_no_rows",
+                detail: "No contact found with id: " + run.contact_id,
+              });
+            }
+          } catch (e) {
             await logEvent(db, run.id, "error", currentNode.node_key, {
-              reason: "contact_name_update_failed",
-              detail: nameUpdateErr.message,
+              reason: "contact_name_update_exception",
+              detail: e instanceof Error ? e.message : String(e),
             });
-          } else {
-            // Também atualiza o nome exibido na conversa (caixa de entrada)
-            await db
-              .from("conversations")
-              .update({ contact_name: captured })
-              .eq("contact_id", run.contact_id!)
-              .eq("account_id", run.account_id);
           }
-        } else if (cfg.var_key === "contact.phone") {
+        } else if (cfg.var_key === "contact.phone" && run.contact_id) {
           const { error: phoneUpdateErr } = await db
             .from("contacts")
             .update({ phone: captured })
-            .eq("id", run.contact_id!);
+            .eq("id", run.contact_id);
           
           if (phoneUpdateErr) {
             await logEvent(db, run.id, "error", currentNode.node_key, {
