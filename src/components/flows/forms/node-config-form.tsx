@@ -203,12 +203,18 @@ export function NodeConfigForm({
 
     case "handoff":
       return (
-        <TextRow
-          label={t("internalNote")}
-          value={(cfg as { note?: string }).note ?? ""}
-          onChange={(v) => onUpdateConfig({ note: v })}
-          rows={2}
-        />
+        <>
+          <TextRow
+            label={t("internalNote")}
+            value={(cfg as { note?: string }).note ?? ""}
+            onChange={(v) => onUpdateConfig({ note: v })}
+            rows={2}
+          />
+          <AgentSelectField
+            agentId={(cfg as { assign_to?: string }).assign_to}
+            onChange={(v) => onUpdateConfig({ assign_to: v })}
+          />
+        </>
       );
 
       case "appointment":
@@ -1266,5 +1272,67 @@ function PipelineConfigFields({
         </Select>
       </div>
     </>
+  );
+}
+
+function AgentSelectField({
+  agentId,
+  onChange,
+}: {
+  agentId: string | undefined;
+  onChange: (id: string | undefined) => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [agents, setAgents] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function load() {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("profiles")
+        .select("user_id, full_name")
+        .order("full_name");
+      if (data) setAgents(data);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="mb-4 mt-4">
+        <label className="mb-1 block text-xs text-muted-foreground">Atribuir a (Opcional)</label>
+        <div className="bg-muted/50 border-border text-muted-foreground flex h-9 items-center rounded-md border px-3 text-xs">
+          Carregando...
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4 mt-4">
+      <label className="mb-1 block text-xs text-muted-foreground">Atribuir a (Opcional)</label>
+      <Select
+        value={agentId || "unassigned"}
+        onValueChange={(val) => onChange(val === "unassigned" ? undefined : val)}
+      >
+        <SelectTrigger className="bg-muted text-xs">
+          <div className="truncate">
+            {agentId 
+              ? agents.find((a) => a.user_id === agentId)?.full_name || agentId 
+              : "Sem atribuição específica"}
+          </div>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="unassigned">Sem atribuição específica</SelectItem>
+          {agents.map((a) => (
+            <SelectItem key={a.user_id} value={a.user_id}>
+              {a.full_name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
