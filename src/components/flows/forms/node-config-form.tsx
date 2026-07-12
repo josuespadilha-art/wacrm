@@ -1315,7 +1315,7 @@ function AgentSelectField({
       <label className="mb-1 block text-xs text-muted-foreground">Atribuir a (Opcional)</label>
       <Select
         value={agentId || "unassigned"}
-        onValueChange={(val) => onChange(val === "unassigned" ? undefined : val)}
+        onValueChange={(val) => onChange(val === "unassigned" || val === null ? undefined : val)}
       >
         <SelectTrigger className="bg-muted text-xs">
           <div className="truncate">
