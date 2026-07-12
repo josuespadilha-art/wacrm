@@ -4,12 +4,14 @@ import { AiError, type AiConfig } from './types'
 
 function config(overrides: Partial<AiConfig> = {}): AiConfig {
   return {
+    accountId: 'account-123',
     provider: 'openai',
     model: 'gpt-test',
     apiKey: 'sk-test',
     systemPrompt: null,
     isActive: true,
     autoReplyEnabled: false,
+    agendaAccessEnabled: false,
     autoReplyMaxPerConversation: 3,
     handoffAgentId: null,
     embeddingsApiKey: null,

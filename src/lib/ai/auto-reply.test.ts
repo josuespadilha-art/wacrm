@@ -68,12 +68,14 @@ const ARGS = {
 
 function aiConfig(overrides: Partial<AiConfig> = {}): AiConfig {
   return {
+    accountId: 'account-1',
     provider: 'openai',
     model: 'gpt-test',
     apiKey: 'sk-test',
     systemPrompt: null,
     isActive: true,
     autoReplyEnabled: true,
+    agendaAccessEnabled: false,
     autoReplyMaxPerConversation: 3,
     handoffAgentId: null,
     embeddingsApiKey: null,

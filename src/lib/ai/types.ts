@@ -14,12 +14,14 @@ export type AiProvider = 'openai' | 'anthropic'
  * (stored AES-256-GCM-encrypted at rest).
  */
 export interface AiConfig {
+  accountId: string
   provider: AiProvider
   model: string
   apiKey: string
   systemPrompt: string | null
   isActive: boolean
   autoReplyEnabled: boolean
+  agendaAccessEnabled: boolean
   autoReplyMaxPerConversation: number
   /** Where auto-reply hands a conversation off when the model bails: an
    *  agent's `auth.users.id`, or null to leave it unassigned (drop into

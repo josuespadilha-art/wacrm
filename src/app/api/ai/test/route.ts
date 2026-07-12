@@ -64,12 +64,14 @@ export async function POST(request: Request) {
 
     try {
       await validateAiCredentials({
+        accountId,
         provider,
         model,
         apiKey: apiKeyPlain,
         systemPrompt: null,
         isActive: true,
         autoReplyEnabled: false,
+        agendaAccessEnabled: false,
         autoReplyMaxPerConversation: 3,
         handoffAgentId: null,
         embeddingsApiKey: null,

@@ -5,6 +5,8 @@ import { AiError, type AiUsage, type ChatMessage } from '../types'
 // ============================================================
 
 export interface ProviderArgs {
+  accountId: string
+  agendaAccessEnabled: boolean
   apiKey: string
   model: string
   systemPrompt: string

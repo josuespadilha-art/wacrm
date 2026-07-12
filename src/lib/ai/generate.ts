@@ -26,6 +26,8 @@ export async function generateReply(args: GenerateArgs): Promise<GenerateResult>
   const { config, systemPrompt, messages } = args
   const timeoutMs = aiRequestTimeoutMs()
   const providerArgs = {
+    accountId: config.accountId,
+    agendaAccessEnabled: config.agendaAccessEnabled,
     apiKey: config.apiKey,
     model: config.model,
     systemPrompt,
