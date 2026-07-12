@@ -306,7 +306,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
     setAccount(null);
-    window.location.href = "/login";
+    window.location.href = "https://visuno.com.br";
   }, []);
 
   const refreshProfile = useCallback(async () => {
