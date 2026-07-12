@@ -20,6 +20,10 @@ export const agendaToolDefinition = {
           description:
             'Data de término para a busca no formato ISO-8601, ex: "2026-07-14T23:59:59Z". Deve ser o fim do dia.',
         },
+        barberName: {
+          type: 'string',
+          description: 'Nome do barbeiro que o cliente deseja (ex: "Igor", "Bruna", "Josue"). Opcional.',
+        }
       },
       required: ['startDate', 'endDate'],
     },
@@ -28,14 +32,26 @@ export const agendaToolDefinition = {
 
 export async function executeAgendaTool(
   accountId: string,
-  args: { startDate: string; endDate: string }
+  args: { startDate: string; endDate: string; barberName?: string }
 ) {
   try {
     const supabase = await createClient()
     const start = startOfDay(parseISO(args.startDate)).toISOString()
     const end = endOfDay(parseISO(args.endDate)).toISOString()
 
-    const { data, error } = await supabase
+    let assigneeId = null
+    if (args.barberName) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('account_id', accountId)
+        .ilike('full_name', `%${args.barberName}%`)
+        .maybeSingle()
+      
+      if (profile) assigneeId = profile.user_id
+    }
+
+    let query = supabase
       .from('appointments')
       .select('start_time, end_time, status')
       .eq('account_id', accountId)
@@ -43,6 +59,12 @@ export async function executeAgendaTool(
       .lte('start_time', end)
       .neq('status', 'canceled')
       .order('start_time', { ascending: true })
+
+    if (assigneeId) {
+      query = query.eq('assignee_id', assigneeId)
+    }
+
+    const { data, error } = await query
 
     if (error) {
       console.error('[ai/tools/agenda] Failed to fetch agenda', error)
