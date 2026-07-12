@@ -1296,9 +1296,36 @@ async function handleReplyForActiveRun(
         
         // Atualiza o contato no banco de dados se a variável for contact.name ou contact.phone
         if (cfg.var_key === "contact.name") {
-          await db.from("contacts").update({ name: captured }).eq("id", run.contact_id);
+          const { error: nameUpdateErr } = await db
+            .from("contacts")
+            .update({ name: captured })
+            .eq("id", run.contact_id!);
+          
+          if (nameUpdateErr) {
+            await logEvent(db, run.id, "error", currentNode.node_key, {
+              reason: "contact_name_update_failed",
+              detail: nameUpdateErr.message,
+            });
+          } else {
+            // Também atualiza o nome exibido na conversa (caixa de entrada)
+            await db
+              .from("conversations")
+              .update({ contact_name: captured })
+              .eq("contact_id", run.contact_id!)
+              .eq("account_id", run.account_id);
+          }
         } else if (cfg.var_key === "contact.phone") {
-          await db.from("contacts").update({ phone: captured }).eq("id", run.contact_id);
+          const { error: phoneUpdateErr } = await db
+            .from("contacts")
+            .update({ phone: captured })
+            .eq("id", run.contact_id!);
+          
+          if (phoneUpdateErr) {
+            await logEvent(db, run.id, "error", currentNode.node_key, {
+              reason: "contact_phone_update_failed",
+              detail: phoneUpdateErr.message,
+            });
+          }
         }
         
         matched = cfg.next_node_key;
