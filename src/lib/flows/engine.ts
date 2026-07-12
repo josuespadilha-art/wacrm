@@ -924,13 +924,19 @@ async function advanceFromNodeKey(
               .eq("id", run.account_id)
               .maybeSingle();
 
+            // Usa o nome capturado pelo fluxo (contact.name) ou busca do banco
+            const contactName = (run.vars as Record<string, unknown>)?.["contact.name"] as string | undefined;
+            const dealTitle = contactName
+              ? `Negócio - ${contactName}`
+              : "Negócio Automático";
+
             const { error: insertErr } = await db.from("deals").insert({
               account_id: run.account_id,
               user_id: acct?.owner_user_id,
               contact_id: run.contact_id,
               pipeline_id: cfg.pipeline_id,
               stage_id: cfg.stage_id,
-              title: "Negócio Automático",
+              title: dealTitle,
               value: 0,
               currency: acct?.default_currency ?? "BRL",
               status: "open",
