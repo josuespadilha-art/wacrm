@@ -143,26 +143,119 @@ export default function AgendaPage() {
       const startTime = new Date(`${newAppt.date}T${newAppt.time}:00`); 
       const endTime = addHours(startTime, 1);
       
+      // 1. Tentar encontrar contato pelo nome
+      let contactId = null;
+      const { data: existingContact } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('account_id', account.id)
+        .ilike('name', newAppt.clientName)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingContact) {
+        contactId = existingContact.id;
+      } else {
+        // Criar contato fictício para agendamento manual (utiliza phone "manual-xxx" para não dar conflito de unicidade de telefone)
+        const dummyPhone = `manual-${Math.random().toString(36).substring(2, 9)}`;
+        const { data: newContact, error: contactError } = await supabase
+          .from('contacts')
+          .insert({
+            account_id: account.id,
+            name: newAppt.clientName,
+            phone: dummyPhone,
+          })
+          .select('id')
+          .single();
+        
+        if (contactError) throw contactError;
+        if (newContact) contactId = newContact.id;
+      }
+
+      // 2. Criar agendamento
       const payload = {
         account_id: account.id,
         assignee_id: newAppt.employeeId,
-        contact_id: null, 
+        contact_id: contactId, 
         notes: `[Agendado Manualmente] Cliente: ${newAppt.clientName} | Serviço: ${newAppt.service}`,
         start_time: startTime.toISOString(),
         end_time: endTime.toISOString(),
         status: 'scheduled'
       };
 
-      const { data, error } = await supabase
+      const { data: apptData, error: apptError } = await supabase
         .from('appointments')
         .insert(payload)
         .select("*, contacts(name, phone)")
         .single();
 
-      if (error) throw error;
+      if (apptError) throw apptError;
+
+      // 3. Criar ou Atualizar Deal no Pipeline
+      if (contactId) {
+        const { data: pipeline } = await supabase
+          .from('pipelines')
+          .select('id')
+          .eq('account_id', account.id)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .single();
+
+        if (pipeline) {
+          const { data: stage } = await supabase
+            .from('pipeline_stages')
+            .select('id')
+            .eq('pipeline_id', pipeline.id)
+            .order('position', { ascending: true })
+            .limit(1)
+            .single();
+
+          if (stage) {
+            // Verificar se o contato já tem um Deal ativo
+            const { data: activeDeal } = await supabase
+              .from('deals')
+              .select('id, value')
+              .eq('contact_id', contactId)
+              .eq('status', 'active')
+              .limit(1)
+              .maybeSingle();
+
+            // Tentar estimar um valor do serviço (ex: Corte=80, Barba=70 se digitado na nota)
+            let value = 0;
+            const textLower = newAppt.service.toLowerCase();
+            if (textLower.includes('corte') && textLower.includes('barba')) value = 150;
+            else if (textLower.includes('corte')) value = 80;
+            else if (textLower.includes('barba')) value = 70;
+            else if (textLower.includes('sobrancelha')) value = 70;
+
+            if (activeDeal) {
+              await supabase
+                .from('deals')
+                .update({
+                  value: Number(activeDeal.value) + value,
+                  title: `Agendado: ${newAppt.service || 'Serviço'}`,
+                  stage_id: stage.id
+                })
+                .eq('id', activeDeal.id);
+            } else {
+              await supabase
+                .from('deals')
+                .insert({
+                  user_id: account.id, // Ou dono da conta
+                  pipeline_id: pipeline.id,
+                  stage_id: stage.id,
+                  contact_id: contactId,
+                  title: `Agendado: ${newAppt.service || 'Serviço'}`,
+                  value: value,
+                  status: 'active'
+                });
+            }
+          }
+        }
+      }
       
-      if (data) {
-        setAppointments(prev => [...prev, data]);
+      if (apptData) {
+        setAppointments(prev => [...prev, apptData]);
       }
       setIsOpen(false);
     } catch (e) {
