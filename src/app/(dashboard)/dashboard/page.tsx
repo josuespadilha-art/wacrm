@@ -47,7 +47,7 @@ type RangeDays = 7 | 30 | 90
 
 export default function DashboardPage() {
   const t = useTranslations('Dashboard.page')
-  const { defaultCurrency } = useAuth()
+  const { defaultCurrency, leadAtRiskDays, leadLostDays } = useAuth()
   const [metrics, setMetrics] = useState<MetricsBundle | null>(null)
   const [metricsLoading, setMetricsLoading] = useState(true)
 
@@ -77,7 +77,7 @@ export default function DashboardPage() {
     // Kick everything off in parallel. Each block has its own
     // setState + finally so a slow query doesn't hold up faster
     // sections — each widget shows its own skeleton independently.
-    void loadMetrics(db)
+    void loadMetrics(db, { atRiskDays: leadAtRiskDays, lostDays: leadLostDays })
       .then((m) => setMetrics(m))
       .catch((err) => console.error('[dashboard] metrics failed:', err))
       .finally(() => setMetricsLoading(false))

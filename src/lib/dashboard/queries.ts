@@ -29,12 +29,17 @@ type DB = SupabaseClient
 
 // --- 1. Metric cards ---------------------------------------------------
 
-export async function loadMetrics(db: DB): Promise<MetricsBundle> {
+export async function loadMetrics(
+  db: DB,
+  opts: { atRiskDays?: number; lostDays?: number } = {},
+): Promise<MetricsBundle> {
   const todayStart = startOfLocalDay().toISOString()
   const yesterdayStart = daysAgoStart(1).toISOString()
   const sevenDaysAgo = daysAgoStart(7).toISOString()
-  const thirtyDaysAgo = daysAgoStart(30).toISOString()
-  const ninetyDaysAgo = daysAgoStart(90).toISOString()
+  const atRiskDays = opts.atRiskDays ?? 30
+  const lostDays = opts.lostDays ?? 90
+  const atRiskDate = daysAgoStart(atRiskDays).toISOString()
+  const lostDate = daysAgoStart(lostDays).toISOString()
 
   const [
     openConvCur,
@@ -94,19 +99,19 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
       .select('id', { count: 'exact', head: true })
       .eq('status', 'lost')
       .gte('updated_at', sevenDaysAgo),
-    // Clientes que compraram entre 30 e 90 dias atrás (inativos recuperáveis)
+    // Clientes que compraram entre atRisk e lostDate (inativos recuperáveis)
     db
       .from('sales')
       .select('contact_id, total_value, created_at')
       .not('contact_id', 'is', null)
-      .lt('created_at', thirtyDaysAgo)
-      .gte('created_at', ninetyDaysAgo),
-    // Clientes que compraram há mais de 90 dias (provavelmente perdidos)
+      .lt('created_at', atRiskDate)
+      .gte('created_at', lostDate),
+    // Clientes que compraram antes de lostDate (provavelmente perdidos)
     db
       .from('sales')
       .select('contact_id, total_value, created_at')
       .not('contact_id', 'is', null)
-      .lt('created_at', ninetyDaysAgo),
+      .lt('created_at', lostDate),
   ])
 
   const openDealsRows = (openDeals.data ?? []) as { value: number | null }[]

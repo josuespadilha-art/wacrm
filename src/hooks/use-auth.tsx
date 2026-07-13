@@ -43,6 +43,10 @@ interface AccountSummary {
   /** Default deal currency (ISO-4217). NOT NULL DEFAULT 'USD' in the
    *  DB (migration 021); narrowed to DEFAULT_CURRENCY when absent. */
   default_currency: string;
+  /** Days of inactivity before a lead is flagged as 'at risk'. Default 30. */
+  lead_at_risk_days: number;
+  /** Days of inactivity before a lead is considered 'lost'. Default 90. */
+  lead_lost_days: number;
 }
 
 interface AuthContextValue {
@@ -88,6 +92,10 @@ interface AuthContextValue {
    *  while loading or when no account is resolved, so callers can use
    *  it unconditionally. */
   defaultCurrency: string;
+  /** Days without purchase to flag a client as 'at risk'. Default 30. */
+  leadAtRiskDays: number;
+  /** Days without purchase to consider a client 'lost'. Default 90. */
+  leadLostDays: number;
   /** True if `accountRole === 'owner'`. */
   isOwner: boolean;
   /** True if `accountRole === 'admin'` (does NOT include owner — use canManageMembers for "admin or above"). */
@@ -171,7 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .from("accounts")
             // default_currency added in migration 021; narrowed to the
             // USD fallback below for older schemas where it reads null.
-            .select("id, name, default_currency")
+            .select("id, name, default_currency, lead_at_risk_days, lead_lost_days")
             .eq("id", data.account_id)
             .maybeSingle();
           if (accountErr) {
@@ -186,6 +194,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               id: account.id,
               name: account.name,
               default_currency: account.default_currency ?? DEFAULT_CURRENCY,
+              lead_at_risk_days: account.lead_at_risk_days ?? 30,
+              lead_lost_days: account.lead_lost_days ?? 90,
             };
           }
         }
@@ -344,6 +354,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshProfile,
         account,
         defaultCurrency: account?.default_currency ?? DEFAULT_CURRENCY,
+        leadAtRiskDays: account?.lead_at_risk_days ?? 30,
+        leadLostDays: account?.lead_lost_days ?? 90,
         ...derived,
       }}
     >
@@ -383,6 +395,8 @@ export function useAuth(): AuthContextValue {
       canManageMembers: false,
       canEditSettings: false,
       canSendMessages: false,
+      leadAtRiskDays: 30,
+      leadLostDays: 90,
     };
   }
   return ctx;

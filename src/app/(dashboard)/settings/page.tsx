@@ -16,6 +16,7 @@ import { TemplateManager } from '@/components/settings/template-manager';
 import { QuickRepliesManager } from '@/components/settings/quick-replies-manager';
 import { FieldsAndTagsPanel } from '@/components/settings/fields-and-tags-panel';
 import { DealsSettings } from '@/components/settings/deals-settings';
+import { LeadRetentionSettings } from '@/components/settings/lead-retention-settings';
 import { MembersTab } from '@/components/settings/members-tab';
 import { ApiKeysSettings } from '@/components/settings/api-keys-settings';
 import { AgendaSettings } from '@/components/settings/agenda-settings';
@@ -64,6 +65,7 @@ export default function SettingsPage() {
     'quick-replies': <QuickRepliesManager />,
     fields: <FieldsAndTagsPanel />,
     deals: <DealsSettings />,
+    retencao: <LeadRetentionSettings />,
     agenda: <AgendaSettings />,
     members: <MembersTab />,
     api: <ApiKeysSettings />,
