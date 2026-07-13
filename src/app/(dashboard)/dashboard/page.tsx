@@ -13,7 +13,9 @@ import {
   UserCheck,
   TriangleAlert,
   RotateCcw,
-  Cake
+  Cake,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react'
 
 import {
@@ -231,6 +233,50 @@ export default function DashboardPage() {
               </div>
             </div>
             <button className="text-xs font-medium text-muted-foreground hover:text-foreground">Ver leads &rarr;</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Cards de Valor - Recuperação e Perdas */}
+      <div className="mt-2 mb-2">
+        <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
+          Estimativa Financeira de Clientes
+        </h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Valor a Recuperar */}
+          <div className="flex items-center gap-4 p-4 rounded-xl border border-green-500/20 bg-green-500/5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-500/10 text-green-500">
+              <TrendingUp className="h-6 w-6" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-muted-foreground mb-0.5">Potencial a Recuperar</p>
+              <p className="text-2xl font-bold text-foreground">
+                {metricsLoading || !metrics
+                  ? '-'
+                  : formatCurrency(metrics.estimatedRecoveryValue, defaultCurrency)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Clientes inativos entre 30 e 90 dias
+              </p>
+            </div>
+          </div>
+
+          {/* Valor Perdido */}
+          <div className="flex items-center gap-4 p-4 rounded-xl border border-red-500/20 bg-red-500/5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-500/10 text-red-500">
+              <TrendingDown className="h-6 w-6" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-muted-foreground mb-0.5">Receita Estimada Perdida</p>
+              <p className="text-2xl font-bold text-foreground">
+                {metricsLoading || !metrics
+                  ? '-'
+                  : formatCurrency(metrics.estimatedLostValue, defaultCurrency)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Clientes sem compras há mais de 90 dias
+              </p>
+            </div>
           </div>
         </div>
       </div>

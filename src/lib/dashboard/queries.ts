@@ -32,8 +32,9 @@ type DB = SupabaseClient
 export async function loadMetrics(db: DB): Promise<MetricsBundle> {
   const todayStart = startOfLocalDay().toISOString()
   const yesterdayStart = daysAgoStart(1).toISOString()
-
   const sevenDaysAgo = daysAgoStart(7).toISOString()
+  const thirtyDaysAgo = daysAgoStart(30).toISOString()
+  const ninetyDaysAgo = daysAgoStart(90).toISOString()
 
   const [
     openConvCur,
@@ -48,6 +49,8 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
     salesYesterday,
     atRiskDeals,
     lostDeals,
+    inactiveContactSales,
+    lostContactSales,
   ] = await Promise.all([
     db.from('conversations').select('id', { count: 'exact', head: true }).eq('status', 'open'),
     db
@@ -91,6 +94,19 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
       .select('id', { count: 'exact', head: true })
       .eq('status', 'lost')
       .gte('updated_at', sevenDaysAgo),
+    // Clientes que compraram entre 30 e 90 dias atrás (inativos recuperáveis)
+    db
+      .from('sales')
+      .select('contact_id, total_value, created_at')
+      .not('contact_id', 'is', null)
+      .lt('created_at', thirtyDaysAgo)
+      .gte('created_at', ninetyDaysAgo),
+    // Clientes que compraram há mais de 90 dias (provavelmente perdidos)
+    db
+      .from('sales')
+      .select('contact_id, total_value, created_at')
+      .not('contact_id', 'is', null)
+      .lt('created_at', ninetyDaysAgo),
   ])
 
   const openDealsRows = (openDeals.data ?? []) as { value: number | null }[]
@@ -101,6 +117,30 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
 
   const salesYesterdayRows = (salesYesterday.data ?? []) as { total_value: number | null }[]
   const salesYesterdayValue = salesYesterdayRows.reduce((sum, s) => sum + (s.total_value ?? 0), 0)
+
+  // Para cada cliente inativo, pega somente a venda mais recente dele e soma.
+  // Isso evita contar o mesmo cliente múltiplas vezes se ele comprou várias vezes.
+  type SaleRow = { contact_id: string; total_value: number | null; created_at: string }
+
+  const buildLastSalePerContact = (rows: SaleRow[]): number => {
+    const lastByContact = new Map<string, number>()
+    // Ordena do mais recente para o mais antigo
+    const sorted = [...rows].sort((a, b) => (a.created_at > b.created_at ? -1 : 1))
+    for (const row of sorted) {
+      if (!lastByContact.has(row.contact_id)) {
+        lastByContact.set(row.contact_id, row.total_value ?? 0)
+      }
+    }
+    return Array.from(lastByContact.values()).reduce((sum, v) => sum + v, 0)
+  }
+
+  const [inactiveSales, lostSales] = [
+    (inactiveContactSales.data ?? []) as SaleRow[],
+    (lostContactSales.data ?? []) as SaleRow[],
+  ]
+
+  const estimatedRecoveryValue = buildLastSalePerContact(inactiveSales)
+  const estimatedLostValue = buildLastSalePerContact(lostSales)
 
   return {
     activeConversations: {
@@ -127,6 +167,8 @@ export async function loadMetrics(db: DB): Promise<MetricsBundle> {
     },
     contactsAtRiskCount: atRiskDeals.count ?? 0,
     contactsToReactivateCount: lostDeals.count ?? 0,
+    estimatedRecoveryValue,
+    estimatedLostValue,
   }
 }
 

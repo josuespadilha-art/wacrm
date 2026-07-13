@@ -17,6 +17,10 @@ export interface MetricsBundle {
   todaySalesCount: MetricDelta
   contactsAtRiskCount: number
   contactsToReactivateCount: number
+  /** Soma do valor da última compra de clientes inativos (30-90 dias sem comprar). */
+  estimatedRecoveryValue: number
+  /** Soma do valor da última compra de clientes perdidos (90+ dias sem comprar). */
+  estimatedLostValue: number
 }
 
 export interface ConversationsSeriesPoint {
