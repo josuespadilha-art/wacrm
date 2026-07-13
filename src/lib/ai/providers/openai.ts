@@ -9,6 +9,7 @@ import {
 } from './shared'
 import { agendaToolDefinition, executeAgendaTool } from '../tools/agenda'
 import { agendarHorarioDefinition, executeAgendarHorario } from '../tools/agendar_horario'
+import { salvarNomeDefinition, executeSalvarNome } from '../tools/salvar_nome'
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions'
 
@@ -59,7 +60,7 @@ export async function generateOpenAi(args: ProviderArgs & { contactId?: string }
           model,
           messages: currentMessages,
           max_completion_tokens: MAX_OUTPUT_TOKENS,
-          tools: agendaAccessEnabled ? [agendaToolDefinition, agendarHorarioDefinition] : undefined,
+          tools: agendaAccessEnabled ? [agendaToolDefinition, agendarHorarioDefinition, salvarNomeDefinition] : undefined,
           tool_choice: agendaAccessEnabled ? 'auto' : undefined,
         }),
         signal: AbortSignal.timeout(timeoutMs),
@@ -119,6 +120,23 @@ export async function generateOpenAi(args: ProviderArgs & { contactId?: string }
               toolResult = { error: 'contactId is missing, cannot schedule.' }
             } else {
               toolResult = await executeAgendarHorario(accountId, contactId, parsedArgs)
+            }
+          } catch (e) {
+            toolResult = { error: 'Failed to parse or execute tool arguments.' }
+          }
+          currentMessages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(toolResult),
+          })
+        } else if (toolCall.function.name === 'salvar_nome') {
+          let toolResult: any
+          try {
+            const parsedArgs = JSON.parse(toolCall.function.arguments)
+            if (!contactId) {
+              toolResult = { error: 'contactId is missing, cannot save name.' }
+            } else {
+              toolResult = await executeSalvarNome(accountId, contactId, parsedArgs)
             }
           } catch (e) {
             toolResult = { error: 'Failed to parse or execute tool arguments.' }

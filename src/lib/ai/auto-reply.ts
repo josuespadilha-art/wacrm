@@ -106,8 +106,25 @@ export async function dispatchInboundToAiReply(
       latestUserMessage(messages),
     )
 
+    // Buscar nome do contato
+    const { data: contact } = await db
+      .from('contacts')
+      .select('name')
+      .eq('id', args.contactId)
+      .maybeSingle()
+
+    let customInstructions = config.systemPrompt || ''
+    if (contact?.name && !contact.name.startsWith('manual-')) {
+      customInstructions += `\n\n[IDENTIFICAÇÃO DO CLIENTE] O nome do cliente é "${contact.name}". Trate-o amigavelmente pelo nome durante a conversa.`
+    } else {
+      customInstructions += `\n\n[IDENTIFICAÇÃO DO CLIENTE] Você ainda NÃO sabe o nome do cliente. Você DEVE perguntar qual é o nome dele de forma amigável no início ou durante a conversa. Assim que ele disser o nome dele, use imediatamente a ferramenta "salvar_nome" para registrar o nome dele no sistema.`
+    }
+
+    // Regra adicional para ferramenta de agendamento
+    customInstructions += `\n\n[AGENDAMENTO AUTOMÁTICO] Quando o cliente concordar com um dia, horário, barbeiro (Igor, Bruna ou Josue) e serviço (Corte: 80, Barba: 70, Sobrancelha: 70, Combo Corte e Barba: 150), você DEVE usar a ferramenta "agendar_horario" para fazer a reserva no banco de dados e atualizar o pipeline. NÃO diga que vai passar para um humano. Agende e confirme você mesmo.`
+
     const systemPrompt = buildSystemPrompt({
-      userPrompt: config.systemPrompt,
+      userPrompt: customInstructions,
       mode: 'auto_reply',
       knowledge,
     })
