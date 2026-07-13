@@ -179,6 +179,9 @@ export async function dispatchInboundToAiReply(
     }
     if (claimed !== true) return // lost the per-conversation cap race
 
+    // Atraso artificial para parecer mais humano (2 segundos)
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+
     await engineSendText({
       accountId,
       userId: configOwnerUserId,
