@@ -15,6 +15,7 @@ export interface GenerateArgs {
   systemPrompt: string
   /** Recent conversation turns, oldest first. */
   messages: ChatMessage[]
+  contactId?: string
 }
 
 /**
@@ -38,7 +39,7 @@ export async function generateReply(args: GenerateArgs): Promise<GenerateResult>
   let result: { text: string; usage: AiUsage | null }
   switch (config.provider) {
     case 'openai':
-      result = await generateOpenAi(providerArgs)
+      result = await generateOpenAi({ ...providerArgs, contactId: args.contactId })
       break
     case 'anthropic':
       result = await generateAnthropic(providerArgs)
