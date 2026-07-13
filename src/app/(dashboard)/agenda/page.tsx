@@ -140,7 +140,7 @@ export default function AgendaPage() {
 
     setSaving(true);
     try {
-      const startTime = new Date(`${newAppt.date}T${newAppt.time}:00-03:00`); 
+      const startTime = new Date(`${newAppt.date}T${newAppt.time}:00`); 
       const endTime = addHours(startTime, 1);
       
       const payload = {
@@ -195,7 +195,7 @@ export default function AgendaPage() {
     if (!selectedAppt || !rescheduleData.date || !rescheduleData.time || !rescheduleData.employeeId) return;
     setRescheduling(true);
     try {
-      const startTime = new Date(`${rescheduleData.date}T${rescheduleData.time}:00-03:00`); 
+      const startTime = new Date(`${rescheduleData.date}T${rescheduleData.time}:00`); 
       const endTime = addHours(startTime, 1);
 
       const { data, error } = await supabase
