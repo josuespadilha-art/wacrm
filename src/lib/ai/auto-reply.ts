@@ -115,12 +115,18 @@ export async function dispatchInboundToAiReply(
       .maybeSingle()
 
     // Verificar se o cliente é novo (contando agendamentos)
-    const { count: apptCount } = await db
-      .from('appointments')
-      .select('*', { count: 'exact', head: true })
-      .eq('contact_id', args.contactId)
+    let apptCount = 0
+    try {
+      const { count } = await db
+        .from('appointments')
+        .select('*', { count: 'exact', head: true })
+        .eq('contact_id', args.contactId)
+      if (count) apptCount = count
+    } catch (e) {
+      console.log('Tabela appointments não existe ou erro ao consultar')
+    }
 
-    const isNewCustomer = !apptCount || apptCount === 0
+    const isNewCustomer = apptCount === 0
 
     let customInstructions = config.systemPrompt || ''
     
