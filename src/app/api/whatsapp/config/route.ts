@@ -287,7 +287,7 @@ export async function POST(request: Request) {
     // /register when the user didn't provide a PIN this time around.
     const { data: existing } = await supabase
       .from('whatsapp_config')
-      .select('id, registered_at, phone_number_id')
+      .select('id, registered_at, phone_number_id, subscribed_apps_at')
       .eq('account_id', accountId)
       .maybeSingle()
 
