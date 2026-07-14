@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/flows/admin-client'
 import { normalizePhone } from '@/lib/whatsapp/phone-utils'
 import { findExistingContact } from '@/lib/contacts/dedupe'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
+import { dispatchInboundToFlows } from '@/lib/flows/engine'
+import { runAutomationsForTrigger } from '@/lib/automations/engine'
 
 export const maxDuration = 60
 
@@ -146,11 +148,69 @@ async function processEvolutionMessage(msgData: any) {
     })
     .eq('id', conversationId)
 
-  // 5. Chamar a IA
-  await dispatchInboundToAiReply({
+  // Contar para ver se é a primeira mensagem (como acabamos de inserir, vai ser 1 se for a primeira)
+  const { count: priorCustomerMsgCount } = await supabaseAdmin()
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversation_id', conversationId)
+    .eq('sender_type', 'customer')
+  const isFirstInboundMessage = (priorCustomerMsgCount ?? 0) <= 1
+
+  // ============================================================
+  // Disparo de Fluxos
+  // ============================================================
+  const flowResult = await dispatchInboundToFlows({
     accountId,
+    userId: configOwnerUserId,
     contactId: contactId,
     conversationId: conversationId,
-    configOwnerUserId: configOwnerUserId,
+    message: {
+      kind: 'text',
+      text: messageContent,
+      meta_message_id: messageId,
+    },
+    isFirstInboundMessage,
   })
+  const flowConsumed = flowResult.consumed
+
+  // ============================================================
+  // Disparo de Automações
+  // ============================================================
+  const automationTriggers: (
+    | 'new_contact_created'
+    | 'first_inbound_message'
+    | 'new_message_received'
+    | 'keyword_match'
+  )[] = []
+
+  if (!flowConsumed) {
+    automationTriggers.push('new_message_received', 'keyword_match')
+  }
+
+  // Se precisar de first_inbound_message:
+  if (isFirstInboundMessage) automationTriggers.unshift('first_inbound_message')
+  // Se fomos nós que criamos o contato agora:
+  if (!existing) automationTriggers.unshift('new_contact_created')
+
+  for (const triggerType of automationTriggers) {
+    runAutomationsForTrigger({
+      accountId,
+      triggerType,
+      contactId: contactId,
+      context: {
+        message_text: messageContent,
+        conversation_id: conversationId,
+      },
+    }).catch((err) => console.error('[automations] dispatch failed:', err))
+  }
+
+  // 5. Chamar a IA (apenas se o fluxo não assumiu)
+  if (!flowConsumed) {
+    await dispatchInboundToAiReply({
+      accountId,
+      contactId: contactId,
+      conversationId: conversationId,
+      configOwnerUserId: configOwnerUserId,
+    })
+  }
 }
