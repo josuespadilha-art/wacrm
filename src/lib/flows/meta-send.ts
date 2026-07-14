@@ -82,23 +82,25 @@ export async function engineSendText(
     throw new Error(`contact phone invalid: ${contact.phone}`)
   }
 
+  const { data: c, error: configErr } = await db
+    .from('whatsapp_config')
+    .select('*')
+    .eq('account_id', args.accountId)
+    .maybeSingle()
+
+  const hasMetaConfig = c && c.access_token
+
   const evoUrl = process.env.EVOLUTION_API_URL
   const evoKey = process.env.EVOLUTION_API_KEY || 'visuno123'
-  const useEvolution = !!evoUrl
+  const useEvolution = !!evoUrl && !hasMetaConfig
 
-  let config: any = null
+  let config: any = c
   let accessToken = ''
 
   if (!useEvolution) {
-    const { data: c, error: configErr } = await db
-      .from('whatsapp_config')
-      .select('*')
-      .eq('account_id', args.accountId)
-      .single()
-    if (configErr || !c) {
+    if (!hasMetaConfig) {
       throw new Error('WhatsApp not configured for this account')
     }
-    config = c
     accessToken = decrypt(config.access_token)
   }
 
@@ -214,23 +216,25 @@ export async function engineSendMedia(
     throw new Error(`contact phone invalid: ${contact.phone}`)
   }
 
+  const { data: c, error: configErr } = await db
+    .from('whatsapp_config')
+    .select('*')
+    .eq('account_id', args.accountId)
+    .maybeSingle()
+
+  const hasMetaConfig = c && c.access_token
+
   const evoUrl = process.env.EVOLUTION_API_URL
   const evoKey = process.env.EVOLUTION_API_KEY || 'visuno123'
-  const useEvolution = !!evoUrl
+  const useEvolution = !!evoUrl && !hasMetaConfig
 
-  let config: any = null
+  let config: any = c
   let accessToken = ''
 
   if (!useEvolution) {
-    const { data: c, error: configErr } = await db
-      .from('whatsapp_config')
-      .select('*')
-      .eq('account_id', args.accountId)
-      .single()
-    if (configErr || !c) {
+    if (!hasMetaConfig) {
       throw new Error('WhatsApp not configured for this account')
     }
-    config = c
     accessToken = decrypt(config.access_token)
   }
 
@@ -394,23 +398,25 @@ async function sendInteractiveViaMeta(
     throw new Error(`contact phone invalid: ${contact.phone}`)
   }
 
+  const { data: c, error: configErr } = await db
+    .from('whatsapp_config')
+    .select('*')
+    .eq('account_id', input.accountId)
+    .maybeSingle()
+
+  const hasMetaConfig = c && c.access_token
+
   const evoUrl = process.env.EVOLUTION_API_URL
   const evoKey = process.env.EVOLUTION_API_KEY || 'visuno123'
-  const useEvolution = !!evoUrl
+  const useEvolution = !!evoUrl && !hasMetaConfig
 
-  let config: any = null
+  let config: any = c
   let accessToken = ''
 
   if (!useEvolution) {
-    const { data: c, error: configErr } = await db
-      .from('whatsapp_config')
-      .select('*')
-      .eq('account_id', input.accountId)
-      .single()
-    if (configErr || !c) {
+    if (!hasMetaConfig) {
       throw new Error('WhatsApp not configured for this account')
     }
-    config = c
     accessToken = decrypt(config.access_token)
   }
 
