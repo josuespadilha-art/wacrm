@@ -55,7 +55,7 @@ async function processEvolutionMessage(msgData: any) {
   // Puxar conta
   const { data: configs } = await supabaseAdmin()
     .from('accounts')
-    .select('id, owner_id')
+    .select('id, owner_user_id')
     .limit(1)
     .single()
     
@@ -65,7 +65,7 @@ async function processEvolutionMessage(msgData: any) {
   }
 
   const accountId = configs.id
-  const configOwnerUserId = configs.owner_id
+  const configOwnerUserId = configs.owner_user_id
 
   // 1. Criar ou Encontrar o Contato
   const contactOutcome = await findOrCreateContact(
