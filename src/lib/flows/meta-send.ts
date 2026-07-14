@@ -89,10 +89,13 @@ export async function engineSendText(
     .maybeSingle()
 
   const hasMetaConfig = c && c.access_token
+  const isEvolutionTenant = c?.waba_id === 'EVOLUTION' || c?.waba_id === 'evolution'
 
   const evoUrl = process.env.EVOLUTION_API_URL
   const evoKey = process.env.EVOLUTION_API_KEY || 'visuno123'
-  const useEvolution = !!evoUrl && !hasMetaConfig
+  const useEvolution = !!evoUrl && (!hasMetaConfig || isEvolutionTenant)
+
+  const instanceName = isEvolutionTenant ? c?.phone_number_id : 'visuno-teste'
 
   let config: any = c
   let accessToken = ''
@@ -108,7 +111,7 @@ export async function engineSendText(
 
   const attempt = async (phone: string): Promise<string> => {
     if (useEvolution) {
-      const response = await fetch(`${evoUrl}/message/sendText/visuno-teste`, {
+      const response = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': evoKey },
         body: JSON.stringify({ number: phone, text: args.text })
@@ -223,10 +226,13 @@ export async function engineSendMedia(
     .maybeSingle()
 
   const hasMetaConfig = c && c.access_token
+  const isEvolutionTenant = c?.waba_id === 'EVOLUTION' || c?.waba_id === 'evolution'
 
   const evoUrl = process.env.EVOLUTION_API_URL
   const evoKey = process.env.EVOLUTION_API_KEY || 'visuno123'
-  const useEvolution = !!evoUrl && !hasMetaConfig
+  const useEvolution = !!evoUrl && (!hasMetaConfig || isEvolutionTenant)
+
+  const instanceName = isEvolutionTenant ? c?.phone_number_id : 'visuno-teste'
 
   let config: any = c
   let accessToken = ''
@@ -242,7 +248,7 @@ export async function engineSendMedia(
 
   const attempt = async (phone: string): Promise<string> => {
     if (useEvolution) {
-      const response = await fetch(`${evoUrl}/message/sendMedia/visuno-teste`, {
+      const response = await fetch(`${evoUrl}/message/sendMedia/${instanceName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': evoKey },
         body: JSON.stringify({
@@ -405,10 +411,13 @@ async function sendInteractiveViaMeta(
     .maybeSingle()
 
   const hasMetaConfig = c && c.access_token
+  const isEvolutionTenant = c?.waba_id === 'EVOLUTION' || c?.waba_id === 'evolution'
 
   const evoUrl = process.env.EVOLUTION_API_URL
   const evoKey = process.env.EVOLUTION_API_KEY || 'visuno123'
-  const useEvolution = !!evoUrl && !hasMetaConfig
+  const useEvolution = !!evoUrl && (!hasMetaConfig || isEvolutionTenant)
+
+  const instanceName = isEvolutionTenant ? c?.phone_number_id : 'visuno-teste'
 
   let config: any = c
   let accessToken = ''
@@ -436,7 +445,7 @@ async function sendInteractiveViaMeta(
       }
       text += '\n(Responda digitando a opção desejada)'
       
-      const response = await fetch(`${evoUrl}/message/sendText/visuno-teste`, {
+      const response = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': evoKey },
         body: JSON.stringify({ number: phone, text })
