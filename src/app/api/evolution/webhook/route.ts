@@ -22,6 +22,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ status: 'ignored (from_me)' }, { status: 200 })
     }
 
+    // Ignorar mensagens de grupos
+    if (msgData.key.remoteJid?.includes('@g.us')) {
+      return NextResponse.json({ status: 'ignored (group)' }, { status: 200 })
+    }
+
     after(async () => {
       try {
         await processEvolutionMessage(msgData)
