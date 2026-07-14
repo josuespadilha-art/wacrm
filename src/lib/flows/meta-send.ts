@@ -82,25 +82,47 @@ export async function engineSendText(
     throw new Error(`contact phone invalid: ${contact.phone}`)
   }
 
-  const { data: config, error: configErr } = await db
-    .from('whatsapp_config')
-    .select('*')
-    .eq('account_id', args.accountId)
-    .single()
-  if (configErr || !config) {
-    throw new Error('WhatsApp not configured for this account')
+  const evoUrl = process.env.EVOLUTION_API_URL
+  const evoKey = process.env.EVOLUTION_API_KEY || 'visuno123'
+  const useEvolution = !!evoUrl
+
+  let config: any = null
+  let accessToken = ''
+
+  if (!useEvolution) {
+    const { data: c, error: configErr } = await db
+      .from('whatsapp_config')
+      .select('*')
+      .eq('account_id', args.accountId)
+      .single()
+    if (configErr || !c) {
+      throw new Error('WhatsApp not configured for this account')
+    }
+    config = c
+    accessToken = decrypt(config.access_token)
   }
 
-  const accessToken = decrypt(config.access_token)
+
 
   const attempt = async (phone: string): Promise<string> => {
-    const r = await sendTextMessage({
-      phoneNumberId: config.phone_number_id,
-      accessToken,
-      to: phone,
-      text: args.text,
-    })
-    return r.messageId
+    if (useEvolution) {
+      const response = await fetch(`${evoUrl}/message/sendText/visuno-teste`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': evoKey },
+        body: JSON.stringify({ number: phone, text: args.text })
+      })
+      if (!response.ok) throw new Error(await response.text())
+      const r = await response.json()
+      return r.key?.id || `evo-${Date.now()}`
+    } else {
+      const r = await sendTextMessage({
+        phoneNumberId: config.phone_number_id,
+        accessToken,
+        to: phone,
+        text: args.text,
+      })
+      return r.messageId
+    }
   }
 
   const variants = phoneVariants(sanitized)
@@ -192,28 +214,56 @@ export async function engineSendMedia(
     throw new Error(`contact phone invalid: ${contact.phone}`)
   }
 
-  const { data: config, error: configErr } = await db
-    .from('whatsapp_config')
-    .select('*')
-    .eq('account_id', args.accountId)
-    .single()
-  if (configErr || !config) {
-    throw new Error('WhatsApp not configured for this account')
+  const evoUrl = process.env.EVOLUTION_API_URL
+  const evoKey = process.env.EVOLUTION_API_KEY || 'visuno123'
+  const useEvolution = !!evoUrl
+
+  let config: any = null
+  let accessToken = ''
+
+  if (!useEvolution) {
+    const { data: c, error: configErr } = await db
+      .from('whatsapp_config')
+      .select('*')
+      .eq('account_id', args.accountId)
+      .single()
+    if (configErr || !c) {
+      throw new Error('WhatsApp not configured for this account')
+    }
+    config = c
+    accessToken = decrypt(config.access_token)
   }
 
-  const accessToken = decrypt(config.access_token)
+
 
   const attempt = async (phone: string): Promise<string> => {
-    const r = await sendMediaMessage({
-      phoneNumberId: config.phone_number_id,
-      accessToken,
-      to: phone,
-      kind: args.kind,
-      link: args.link,
-      caption: args.caption,
-      filename: args.filename,
-    })
-    return r.messageId
+    if (useEvolution) {
+      const response = await fetch(`${evoUrl}/message/sendMedia/visuno-teste`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': evoKey },
+        body: JSON.stringify({
+          number: phone,
+          mediatype: args.kind,
+          media: args.link,
+          caption: args.caption,
+          fileName: args.filename || 'arquivo'
+        })
+      })
+      if (!response.ok) throw new Error(await response.text())
+      const r = await response.json()
+      return r.key?.id || `evo-${Date.now()}`
+    } else {
+      const r = await sendMediaMessage({
+        phoneNumberId: config.phone_number_id,
+        accessToken,
+        to: phone,
+        kind: args.kind,
+        link: args.link,
+        caption: args.caption,
+        filename: args.filename,
+      })
+      return r.messageId
+    }
   }
 
   const variants = phoneVariants(sanitized)
@@ -344,41 +394,75 @@ async function sendInteractiveViaMeta(
     throw new Error(`contact phone invalid: ${contact.phone}`)
   }
 
-  const { data: config, error: configErr } = await db
-    .from('whatsapp_config')
-    .select('*')
-    .eq('account_id', input.accountId)
-    .single()
-  if (configErr || !config) {
-    throw new Error('WhatsApp not configured for this account')
+  const evoUrl = process.env.EVOLUTION_API_URL
+  const evoKey = process.env.EVOLUTION_API_KEY || 'visuno123'
+  const useEvolution = !!evoUrl
+
+  let config: any = null
+  let accessToken = ''
+
+  if (!useEvolution) {
+    const { data: c, error: configErr } = await db
+      .from('whatsapp_config')
+      .select('*')
+      .eq('account_id', input.accountId)
+      .single()
+    if (configErr || !c) {
+      throw new Error('WhatsApp not configured for this account')
+    }
+    config = c
+    accessToken = decrypt(config.access_token)
   }
 
-  const accessToken = decrypt(config.access_token)
+
 
   const attempt = async (phone: string): Promise<string> => {
-    if (input.kind === 'buttons') {
-      const r = await sendInteractiveButtons({
+    if (useEvolution) {
+      // Como list/buttons podem falhar no Evolution, mandamos formatado em texto pra garantir a entrega.
+      let text = input.bodyText + '\n\n'
+      if (input.kind === 'buttons') {
+        input.buttons.forEach((b, i) => text += `[ ${b.title} ]\n`)
+      } else {
+        input.sections.forEach(s => {
+          text += `*${s.title}*\n`
+          s.rows.forEach(r => text += `- ${r.title} ${r.description ? `(${r.description})` : ''}\n`)
+        })
+      }
+      text += '\n(Responda digitando a opção desejada)'
+      
+      const response = await fetch(`${evoUrl}/message/sendText/visuno-teste`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': evoKey },
+        body: JSON.stringify({ number: phone, text })
+      })
+      if (!response.ok) throw new Error(await response.text())
+      const r = await response.json()
+      return r.key?.id || `evo-${Date.now()}`
+    } else {
+      if (input.kind === 'buttons') {
+        const r = await sendInteractiveButtons({
+          phoneNumberId: config.phone_number_id,
+          accessToken,
+          to: phone,
+          bodyText: input.bodyText,
+          buttons: input.buttons,
+          headerText: input.headerText,
+          footerText: input.footerText,
+        })
+        return r.messageId
+      }
+      const r = await sendInteractiveList({
         phoneNumberId: config.phone_number_id,
         accessToken,
         to: phone,
         bodyText: input.bodyText,
-        buttons: input.buttons,
+        buttonLabel: input.buttonLabel,
+        sections: input.sections,
         headerText: input.headerText,
         footerText: input.footerText,
       })
       return r.messageId
     }
-    const r = await sendInteractiveList({
-      phoneNumberId: config.phone_number_id,
-      accessToken,
-      to: phone,
-      bodyText: input.bodyText,
-      buttonLabel: input.buttonLabel,
-      sections: input.sections,
-      headerText: input.headerText,
-      footerText: input.footerText,
-    })
-    return r.messageId
   }
 
   // Same phone-variant retry as automations/meta-send.ts. Numbers
