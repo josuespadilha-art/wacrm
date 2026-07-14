@@ -1,7 +1,7 @@
 import { NextResponse, after } from 'next/server'
 import { supabaseAdmin } from '@/lib/flows/admin-client'
 import { normalizePhone } from '@/lib/whatsapp/phone-utils'
-import { findOrCreateContact, findOrCreateConversation } from '@/lib/whatsapp/resolve-conversation'
+import { findExistingContact } from '@/lib/contacts/dedupe'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
 
 export const maxDuration = 60
@@ -68,28 +68,54 @@ async function processEvolutionMessage(msgData: any) {
   const configOwnerUserId = configs.owner_user_id
 
   // 1. Criar ou Encontrar o Contato
-  const contactOutcome = await findOrCreateContact(
-    accountId,
-    configOwnerUserId,
-    senderPhone,
-    contactName
-  )
-  if (!contactOutcome) return
-  const contactRecord = contactOutcome.contact
+  let contactId: string
+  const existing = await findExistingContact(supabaseAdmin(), accountId, senderPhone)
+  if (existing) {
+    contactId = existing.id
+  } else {
+    const { data: created } = await supabaseAdmin()
+      .from('contacts')
+      .insert({
+        account_id: accountId,
+        user_id: configOwnerUserId,
+        phone: senderPhone,
+        name: contactName,
+      })
+      .select('id')
+      .single()
+    if (!created) return
+    contactId = created.id
+  }
 
   // 2. Criar ou Encontrar a Conversa
-  const convResult = await findOrCreateConversation(
-    accountId,
-    configOwnerUserId,
-    contactRecord.id
-  )
-  if (!convResult) return
-  const conversation = convResult.conversation
+  let conversationId: string
+  const { data: conv } = await supabaseAdmin()
+    .from('conversations')
+    .select('id, unread_count')
+    .eq('account_id', accountId)
+    .eq('contact_id', contactId)
+    .maybeSingle()
+    
+  if (conv?.id) {
+    conversationId = conv.id
+  } else {
+    const { data: newConv } = await supabaseAdmin()
+      .from('conversations')
+      .insert({
+        account_id: accountId,
+        user_id: configOwnerUserId,
+        contact_id: contactId,
+      })
+      .select('id')
+      .single()
+    if (!newConv) return
+    conversationId = newConv.id
+  }
 
   // 3. Inserir a Mensagem no banco
   const messageId = msgData.key.id
   const { error: msgError } = await supabaseAdmin().from('messages').insert({
-    conversation_id: conversation.id,
+    conversation_id: conversationId,
     sender_type: 'customer',
     content_type: 'text',
     content_text: messageContent,
@@ -104,21 +130,22 @@ async function processEvolutionMessage(msgData: any) {
   }
 
   // 4. Atualizar o contador da conversa
+  const unreadCount = conv?.unread_count ? conv.unread_count + 1 : 1
   await supabaseAdmin()
     .from('conversations')
     .update({
       last_message_text: messageContent,
       last_message_at: new Date().toISOString(),
-      unread_count: (conversation.unread_count || 0) + 1,
+      unread_count: unreadCount,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', conversation.id)
+    .eq('id', conversationId)
 
   // 5. Chamar a IA
   await dispatchInboundToAiReply({
     accountId,
-    contactId: contactRecord.id,
-    conversationId: conversation.id,
+    contactId: contactId,
+    conversationId: conversationId,
     messageText: messageContent,
   })
 }
