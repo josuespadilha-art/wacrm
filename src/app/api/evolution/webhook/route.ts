@@ -19,10 +19,8 @@ export async function POST(request: Request) {
     }
 
     const msgData = body.data
-    // Verifica se fomos nós que enviamos (bot) e ignora para não entrar em loop
-    if (msgData.key.fromMe) {
-      return NextResponse.json({ status: 'ignored (from_me)' }, { status: 200 })
-    }
+    // Permite "fromMe" mas marcamos para processar como agente
+    const isFromMe = msgData.key.fromMe
 
     // Ignorar mensagens de grupos
     if (msgData.key.remoteJid?.includes('@g.us')) {
@@ -31,7 +29,7 @@ export async function POST(request: Request) {
 
     after(async () => {
       try {
-        await processEvolutionMessage(msgData)
+        await processEvolutionMessage(msgData, isFromMe)
       } catch (err) {
         console.error('[evolution webhook] Error processing message:', err)
       }
@@ -44,7 +42,7 @@ export async function POST(request: Request) {
   }
 }
 
-async function processEvolutionMessage(msgData: any) {
+async function processEvolutionMessage(msgData: any, isFromMe: boolean = false) {
   // A Evolution API envia o numero como `551199999999@s.whatsapp.net`
   const senderPhone = normalizePhone(msgData.key.remoteJid.split('@')[0])
   const contactName = msgData.pushName || senderPhone
@@ -123,11 +121,11 @@ async function processEvolutionMessage(msgData: any) {
   const messageId = msgData.key.id
   const { error: msgError } = await supabaseAdmin().from('messages').insert({
     conversation_id: conversationId,
-    sender_type: 'customer',
+    sender_type: isFromMe ? 'agent' : 'customer',
     content_type: 'text',
     content_text: messageContent,
     message_id: messageId,
-    status: 'delivered',
+    status: isFromMe ? 'sent' : 'delivered',
     created_at: new Date().toISOString(),
   })
 
@@ -137,7 +135,7 @@ async function processEvolutionMessage(msgData: any) {
   }
 
   // 4. Atualizar o contador da conversa
-  const unreadCount = conv?.unread_count ? conv.unread_count + 1 : 1
+  const unreadCount = isFromMe ? 0 : (conv?.unread_count ? conv.unread_count + 1 : 1)
   await supabaseAdmin()
     .from('conversations')
     .update({
@@ -147,6 +145,9 @@ async function processEvolutionMessage(msgData: any) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', conversationId)
+
+  // Se for uma mensagem que nós enviamos (fromMe), não disparamos fluxos, automações ou IA!
+  if (isFromMe) return
 
   // Contar para ver se é a primeira mensagem (como acabamos de inserir, vai ser 1 se for a primeira)
   const { count: priorCustomerMsgCount } = await supabaseAdmin()
