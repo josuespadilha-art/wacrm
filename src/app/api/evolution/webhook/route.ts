@@ -146,6 +146,6 @@ async function processEvolutionMessage(msgData: any) {
     accountId,
     contactId: contactId,
     conversationId: conversationId,
-    messageText: messageContent,
+    configOwnerUserId: configOwnerUserId,
   })
 }
