@@ -54,18 +54,18 @@ async function processEvolutionMessage(msgData: any) {
 
   // Puxar conta
   const { data: configs } = await supabaseAdmin()
-    .from('whatsapp_config')
-    .select('account_id, user_id')
+    .from('accounts')
+    .select('id, owner_id')
     .limit(1)
     .single()
     
   if (!configs) {
-    console.error('[evolution webhook] Nenhuma config do whatsapp encontrada')
+    console.error('[evolution webhook] Nenhuma conta encontrada no CRM')
     return
   }
 
-  const accountId = configs.account_id
-  const configOwnerUserId = configs.user_id
+  const accountId = configs.id
+  const configOwnerUserId = configs.owner_id
 
   // 1. Criar ou Encontrar o Contato
   const contactOutcome = await findOrCreateContact(
