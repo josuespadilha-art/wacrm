@@ -8,6 +8,7 @@ import { buildHandoffSummary } from './handoff'
 import { logAiUsage } from './usage'
 import { latestUserMessage } from './query'
 import { engineSendText } from '@/lib/flows/meta-send'
+import { evolutionSendText } from '@/lib/whatsapp/evolution-send'
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit'
 
 interface DispatchArgs {
@@ -113,11 +114,20 @@ export async function dispatchInboundToAiReply(
       .eq('id', args.contactId)
       .maybeSingle()
 
+    // Verificar se o cliente é novo (contando agendamentos)
+    const { count: apptCount } = await db
+      .from('appointments')
+      .select('*', { count: 'exact', head: true })
+      .eq('contact_id', args.contactId)
+
+    const isNewCustomer = !apptCount || apptCount === 0
+
     let customInstructions = config.systemPrompt || ''
-    if (contact?.name && !contact.name.startsWith('manual-')) {
+    
+    if (isNewCustomer) {
+      customInstructions += `\n\n[IDENTIFICAÇÃO DO CLIENTE] Este é um CLIENTE NOVO (não tem agendamentos salvos). Mesmo que o sistema informe o nome como "${contact?.name || ''}", você NÃO deve presumir que este é o nome dele (pode ser o WhatsApp de outra pessoa ou da empresa). Você DEVE perguntar logo no início ou na primeira oportunidade: "Como posso te chamar?" ou "Qual o seu nome?". Assim que ele responder, use a ferramenta "salvar_nome" para gravar o nome correto e, a partir de então, use apenas o nome informado por ele.`
+    } else if (contact?.name && !contact.name.startsWith('manual-')) {
       customInstructions += `\n\n[IDENTIFICAÇÃO DO CLIENTE] O nome do cliente é "${contact.name}". Trate-o amigavelmente pelo nome durante a conversa.`
-    } else {
-      customInstructions += `\n\n[IDENTIFICAÇÃO DO CLIENTE] Você ainda NÃO sabe o nome do cliente. Você DEVE perguntar qual é o nome dele de forma amigável no início ou durante a conversa. Assim que ele disser o nome dele, use imediatamente a ferramenta "salvar_nome" para registrar o nome dele no sistema.`
     }
 
     // Regra adicional para ferramenta de agendamento
@@ -200,14 +210,24 @@ export async function dispatchInboundToAiReply(
     // Atraso artificial para parecer mais humano (2 segundos)
     await new Promise((resolve) => setTimeout(resolve, 2000))
 
-    await engineSendText({
-      accountId,
-      userId: configOwnerUserId,
-      conversationId,
-      contactId,
-      text,
-      aiGenerated: true,
-    })
+    if (process.env.EVOLUTION_API_URL) {
+      await evolutionSendText({
+        accountId,
+        conversationId,
+        contactId,
+        text,
+        aiGenerated: true,
+      })
+    } else {
+      await engineSendText({
+        accountId,
+        userId: configOwnerUserId,
+        conversationId,
+        contactId,
+        text,
+        aiGenerated: true,
+      })
+    }
   } catch (err) {
     console.error('[ai auto-reply] dispatch failed:', err)
   }
