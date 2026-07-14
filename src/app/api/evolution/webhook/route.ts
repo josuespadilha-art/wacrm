@@ -3,8 +3,6 @@ import { supabaseAdmin } from '@/lib/flows/admin-client'
 import { normalizePhone } from '@/lib/whatsapp/phone-utils'
 import { findExistingContact } from '@/lib/contacts/dedupe'
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply'
-import { dispatchInboundToFlows } from '@/lib/flows/engine'
-import { runAutomationsForTrigger } from '@/lib/automations/engine'
 
 export const maxDuration = 60
 
@@ -19,8 +17,10 @@ export async function POST(request: Request) {
     }
 
     const msgData = body.data
-    // Permite "fromMe" mas marcamos para processar como agente
-    const isFromMe = msgData.key.fromMe
+    // Verifica se fomos nós que enviamos (bot) e ignora para não entrar em loop
+    if (msgData.key.fromMe) {
+      return NextResponse.json({ status: 'ignored (from_me)' }, { status: 200 })
+    }
 
     // Ignorar mensagens de grupos
     if (msgData.key.remoteJid?.includes('@g.us')) {
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     after(async () => {
       try {
-        await processEvolutionMessage(msgData, isFromMe)
+        await processEvolutionMessage(msgData)
       } catch (err) {
         console.error('[evolution webhook] Error processing message:', err)
       }
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   }
 }
 
-async function processEvolutionMessage(msgData: any, isFromMe: boolean = false) {
+async function processEvolutionMessage(msgData: any) {
   // A Evolution API envia o numero como `551199999999@s.whatsapp.net`
   const senderPhone = normalizePhone(msgData.key.remoteJid.split('@')[0])
   const contactName = msgData.pushName || senderPhone
@@ -121,11 +121,11 @@ async function processEvolutionMessage(msgData: any, isFromMe: boolean = false) 
   const messageId = msgData.key.id
   const { error: msgError } = await supabaseAdmin().from('messages').insert({
     conversation_id: conversationId,
-    sender_type: isFromMe ? 'agent' : 'customer',
+    sender_type: 'customer',
     content_type: 'text',
     content_text: messageContent,
     message_id: messageId,
-    status: isFromMe ? 'sent' : 'delivered',
+    status: 'delivered',
     created_at: new Date().toISOString(),
   })
 
@@ -135,7 +135,7 @@ async function processEvolutionMessage(msgData: any, isFromMe: boolean = false) 
   }
 
   // 4. Atualizar o contador da conversa
-  const unreadCount = isFromMe ? 0 : (conv?.unread_count ? conv.unread_count + 1 : 1)
+  const unreadCount = conv?.unread_count ? conv.unread_count + 1 : 1
   await supabaseAdmin()
     .from('conversations')
     .update({
@@ -146,72 +146,11 @@ async function processEvolutionMessage(msgData: any, isFromMe: boolean = false) 
     })
     .eq('id', conversationId)
 
-  // Se for uma mensagem que nós enviamos (fromMe), não disparamos fluxos, automações ou IA!
-  if (isFromMe) return
-
-  // Contar para ver se é a primeira mensagem (como acabamos de inserir, vai ser 1 se for a primeira)
-  const { count: priorCustomerMsgCount } = await supabaseAdmin()
-    .from('messages')
-    .select('id', { count: 'exact', head: true })
-    .eq('conversation_id', conversationId)
-    .eq('sender_type', 'customer')
-  const isFirstInboundMessage = (priorCustomerMsgCount ?? 0) <= 1
-
-  // ============================================================
-  // Disparo de Fluxos
-  // ============================================================
-  const flowResult = await dispatchInboundToFlows({
+  // 5. Chamar a IA
+  await dispatchInboundToAiReply({
     accountId,
-    userId: configOwnerUserId,
     contactId: contactId,
     conversationId: conversationId,
-    message: {
-      kind: 'text',
-      text: messageContent,
-      meta_message_id: messageId,
-    },
-    isFirstInboundMessage,
+    configOwnerUserId: configOwnerUserId,
   })
-  const flowConsumed = flowResult.consumed
-
-  // ============================================================
-  // Disparo de Automações
-  // ============================================================
-  const automationTriggers: (
-    | 'new_contact_created'
-    | 'first_inbound_message'
-    | 'new_message_received'
-    | 'keyword_match'
-  )[] = []
-
-  if (!flowConsumed) {
-    automationTriggers.push('new_message_received', 'keyword_match')
-  }
-
-  // Se precisar de first_inbound_message:
-  if (isFirstInboundMessage) automationTriggers.unshift('first_inbound_message')
-  // Se fomos nós que criamos o contato agora:
-  if (!existing) automationTriggers.unshift('new_contact_created')
-
-  for (const triggerType of automationTriggers) {
-    runAutomationsForTrigger({
-      accountId,
-      triggerType,
-      contactId: contactId,
-      context: {
-        message_text: messageContent,
-        conversation_id: conversationId,
-      },
-    }).catch((err) => console.error('[automations] dispatch failed:', err))
-  }
-
-  // 5. Chamar a IA (apenas se o fluxo não assumiu)
-  if (!flowConsumed) {
-    await dispatchInboundToAiReply({
-      accountId,
-      contactId: contactId,
-      conversationId: conversationId,
-      configOwnerUserId: configOwnerUserId,
-    })
-  }
 }

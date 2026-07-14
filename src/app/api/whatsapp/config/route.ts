@@ -87,7 +87,7 @@ export async function GET() {
 
     const { data: config, error: configError } = await supabase
       .from('whatsapp_config')
-      .select('phone_number_id, waba_id, access_token, status')
+      .select('phone_number_id, access_token, status')
       .eq('account_id', accountId)
       .maybeSingle()
 
@@ -127,12 +127,6 @@ export async function GET() {
         },
         { status: 200 }
       )
-    }
-
-    const isEvolution = config.waba_id === 'EVOLUTION' || config.waba_id === 'evolution'
-
-    if (isEvolution) {
-      return NextResponse.json({ connected: true, phone_info: { verified_name: 'Evolution API (Configuração)' } })
     }
 
     // Validate credentials against Meta
@@ -241,27 +235,20 @@ export async function POST(request: Request) {
       )
     }
 
-    // Verify credentials with Meta BEFORE saving (unless it's an Evolution API config)
-    const isEvolution = waba_id === 'EVOLUTION' || waba_id === 'evolution'
-    let phoneInfo = null
-    
-    if (!isEvolution) {
-      try {
-        phoneInfo = await verifyPhoneNumber({
-          phoneNumberId: phone_number_id,
-          accessToken: access_token,
-        })
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown Meta API error'
-        console.error('Meta API verification failed during save:', message)
-        return NextResponse.json(
-          { error: `Meta API error: ${message}` },
-          { status: 400 }
-        )
-      }
-    } else {
-      // Mocked phoneInfo for Evolution API
-      phoneInfo = { verified_name: 'Evolution API (Configuração)' }
+    // Verify credentials with Meta BEFORE saving
+    let phoneInfo
+    try {
+      phoneInfo = await verifyPhoneNumber({
+        phoneNumberId: phone_number_id,
+        accessToken: access_token,
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown Meta API error'
+      console.error('Meta API verification failed during save:', message)
+      return NextResponse.json(
+        { error: `Meta API error: ${message}` },
+        { status: 400 }
+      )
     }
 
     // Encrypt sensitive tokens before storing
@@ -287,7 +274,7 @@ export async function POST(request: Request) {
     // /register when the user didn't provide a PIN this time around.
     const { data: existing } = await supabase
       .from('whatsapp_config')
-      .select('id, registered_at, phone_number_id, subscribed_apps_at')
+      .select('id, registered_at, phone_number_id')
       .eq('account_id', accountId)
       .maybeSingle()
 
@@ -309,7 +296,7 @@ export async function POST(request: Request) {
     // is not a failure, just an incomplete-but-valid save.
     let registrationSkipped = false
 
-    const needsRegistration = !isEvolution && (!sameNumber || (typeof pin === 'string' && pin.length > 0))
+    const needsRegistration = !sameNumber || (typeof pin === 'string' && pin.length > 0)
     if (needsRegistration) {
       if (!pin) {
         // No PIN provided. Meta TEST numbers (Developer Console) are
@@ -346,8 +333,8 @@ export async function POST(request: Request) {
     // side, so we call on every save and persist the timestamp.
     // Skipped only when there's no waba_id (legacy rows from before
     // we required it).
-    let subscribedAppsAt: string | null = existing?.subscribed_apps_at ?? null
-    if (!sameNumber && !isEvolution) {
+    let subscribedAppsAt: string | null = null
+    if (waba_id) {
       try {
         await subscribeWabaToApp({
           wabaId: waba_id,
@@ -355,15 +342,12 @@ export async function POST(request: Request) {
         })
         subscribedAppsAt = new Date().toISOString()
       } catch (err) {
-        // App subscription is highly privileged (requires the WABA
-        // admin to have explicitly shared it to the system user in
-        // Business Settings). Don't fail the whole save if this drops,
-        // just log it. The user can retry later if events don't flow.
-        console.warn('WABA app subscription failed:', err)
+        const message = err instanceof Error ? err.message : String(err)
+        console.warn('WABA subscribed_apps failed (non-fatal):', message)
+        // Subscription failures are rare once the App has the right
+        // permissions; we don't block save on them — the diagnostic
+        // endpoint surfaces this state too.
       }
-    } else if (isEvolution) {
-      subscribedAppsAt = new Date().toISOString()
-      registeredAt = new Date().toISOString()
     }
 
     // Persist everything in one shot. If /register failed we still
