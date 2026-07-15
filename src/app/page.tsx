@@ -608,8 +608,8 @@ export default function LandingPage() {
         <header className="hero" id="top">
           <div className="wrap">
             <div className="hero-badge">💬 Muito mais que um bot. Uma plataforma completa.</div>
-            <h1>O sistema que organiza e automatiza <span className="grad">suas vendas através do WhatsApp.</span></h1>
-            <p className="lead">Organize contatos, acompanhe negócios, recupere clientes perdidos e extraia inteligência de dados de cada conversa com nossa IA.</p>
+            <h1>Recupere clientes e pare de perdê-los <span className="grad">por falta de acompanhamento.</span></h1>
+            <p className="lead">A Visuno monitora automaticamente sua base de clientes, identifica quem deixou de comprar, automatiza o relacionamento pelo WhatsApp e ajuda sua empresa a aumentar a recorrência e o faturamento.</p>
             <div className="hero-actions">
               <Link href="/signup" className="btn btn-primary btn-lg">Começar teste gratuito →</Link>
             </div>
