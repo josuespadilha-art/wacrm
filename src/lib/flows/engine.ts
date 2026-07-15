@@ -54,6 +54,7 @@ import {
   type SendMediaNodeConfig,
   type SendMessageNodeConfig,
   type SetTagNodeConfig,
+  type SearchProductsNodeConfig,
   type StartNodeConfig,
   type KeywordTriggerConfig,
   type AppointmentNodeConfig,
@@ -124,7 +125,8 @@ export function isAutoAdvancing(node_type: string): boolean {
     node_type === "send_message" ||
     node_type === "send_media" ||
     node_type === "condition" ||
-    node_type === "set_tag"
+    node_type === "set_tag" ||
+    node_type === "search_products"
   );
 }
 
@@ -859,6 +861,40 @@ async function advanceFromNodeKey(
         // strand the customer mid-flow.
         await logEvent(db, run.id, "error", node.node_key, {
           reason: "set_tag_failed",
+          detail: err instanceof Error ? err.message : String(err),
+        });
+      }
+      currentKey = cfg.next_node_key;
+      continue;
+    }
+    if (node.node_type === "search_products") {
+      const cfg = node.config as unknown as SearchProductsNodeConfig;
+      try {
+        const searchTerm = (run.vars[cfg.search_term_variable] as string) || "";
+        
+        const { data: products, error } = await db
+          .from("products")
+          .select("name, price")
+          .eq("account_id", run.account_id)
+          .eq("active", true)
+          .ilike("name", `%${searchTerm}%`)
+          .limit(10);
+          
+        if (error) throw error;
+        
+        let resultText = "Nenhum produto encontrado.";
+        if (products && products.length > 0) {
+          resultText = products.map((p, i) => `${i + 1}. ${p.name} - R$ ${Number(p.price).toFixed(2)}`).join("\n");
+        }
+        
+        // Update variables
+        const newVars = { ...run.vars, [cfg.output_variable]: resultText };
+        await db.from("flow_runs").update({ vars: newVars }).eq("id", run.id);
+        run.vars = newVars;
+        
+      } catch (err) {
+        await logEvent(db, run.id, "error", node.node_key, {
+          reason: "search_products_failed",
           detail: err instanceof Error ? err.message : String(err),
         });
       }

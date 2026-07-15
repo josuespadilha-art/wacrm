@@ -201,6 +201,39 @@ export function NodeConfigForm({
         />
       );
 
+    case "search_products":
+      return (
+        <>
+          <div className="mb-4">
+            <label className="mb-1 block text-xs text-muted-foreground">Variável de Busca</label>
+            <Input
+              value={(cfg as any).search_term_variable ?? ""}
+              onChange={(e) => onUpdateConfig({ search_term_variable: e.target.value.replace(/[^a-zA-Z0-9_.]/g, "") })}
+              placeholder="Ex: produto"
+              className="bg-muted font-mono text-xs"
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground">Nome da variável preenchida anteriormente pelo cliente.</p>
+          </div>
+          <div className="mb-4">
+            <label className="mb-1 block text-xs text-muted-foreground">Salvar Resultado Em</label>
+            <Input
+              value={(cfg as any).output_variable ?? ""}
+              onChange={(e) => onUpdateConfig({ output_variable: e.target.value.replace(/[^a-zA-Z0-9_.]/g, "") })}
+              placeholder="Ex: catalogo"
+              className="bg-muted font-mono text-xs"
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground">A lista de produtos formatada será salva aqui.</p>
+          </div>
+          <NextNodeRow
+            value={(cfg as { next_node_key?: string }).next_node_key ?? ""}
+            allNodes={allNodes}
+            currentKey={node.node_key}
+            onChange={(v) => onUpdateConfig({ next_node_key: v })}
+            label={t("advancesTo")}
+          />
+        </>
+      );
+
     case "handoff":
       return (
         <>

@@ -30,6 +30,7 @@ import {
   UserPlus,
   Workflow,
   Briefcase,
+  Search,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -51,6 +52,7 @@ export type NodeType =
   | 'collect_input'
   | 'condition'
   | 'set_tag'
+  | 'search_products'
   | 'handoff'
   | 'appointment'
   | 'change_pipeline_stage'
@@ -141,6 +143,13 @@ export const NODE_META: Record<
     icon: Inbox,
     color: 'text-teal-400',
     blurb: 'Asks a question, saves the reply',
+    category: 'logic',
+  },
+  search_products: {
+    label: 'Consultar Produto',
+    icon: Search,
+    color: 'text-amber-500',
+    blurb: 'Busca produtos no catálogo usando uma variável',
     category: 'logic',
   },
   condition: {

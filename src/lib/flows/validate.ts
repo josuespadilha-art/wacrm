@@ -766,6 +766,50 @@ function validateNode(
       break;
     }
 
+    case "search_products": {
+      const cfg = node.config as {
+        search_term_variable?: string;
+        output_variable?: string;
+        next_node_key?: string;
+      };
+      if (!cfg.search_term_variable?.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "search_term_variable",
+          message: "A variável de busca é obrigatória.",
+        });
+      }
+      if (!cfg.output_variable?.trim()) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "output_variable",
+          message: "A variável de destino é obrigatória.",
+        });
+      }
+      if (!cfg.next_node_key) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "next_node_key",
+          message: "O nó deve apontar para um próximo nó.",
+        });
+      } else if (!knownKeys.has(cfg.next_node_key)) {
+        issues.push({
+          severity: "error",
+          scope: "node",
+          node_key: node.node_key,
+          field: "next_node_key",
+          message: `O nó aponta para um nó inexistente "${cfg.next_node_key}".`,
+        });
+      }
+      break;
+    }
+
     case "handoff":
     case "end":
       // Terminal nodes have no outgoing edges; nothing to validate
@@ -846,7 +890,8 @@ function outgoingEdges(node: NodeInput): string[] {
     case "send_message":
     case "send_media":
     case "set_tag":
-    case "change_pipeline_stage": {
+    case "change_pipeline_stage":
+    case "search_products": {
       const cfg = node.config as { next_node_key?: string };
       return cfg.next_node_key ? [cfg.next_node_key] : [];
     }
