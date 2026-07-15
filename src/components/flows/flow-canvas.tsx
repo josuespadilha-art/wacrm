@@ -729,6 +729,7 @@ const ADD_NODE_TYPES: NodeType[] = [
   'collect_input',
   'condition',
   'set_tag',
+  'search_products',
   'change_pipeline_stage',
   'handoff',
   'appointment',
