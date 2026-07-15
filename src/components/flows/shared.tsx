@@ -462,5 +462,13 @@ export function summarizeNode(
       const note = typeof cfg.note === 'string' ? cfg.note : '';
       return note.length > 0 ? truncate(note) : null;
     }
+    case 'search_products': {
+      const searchTermVar = typeof cfg.search_term_variable === 'string' ? cfg.search_term_variable : '';
+      const outputVar = typeof cfg.output_variable === 'string' ? cfg.output_variable : '';
+      if (searchTermVar) {
+        return `vars.${searchTermVar} → vars.${outputVar || '...'}`;
+      }
+      return null;
+    }
   }
 }
