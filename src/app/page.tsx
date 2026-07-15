@@ -909,45 +909,39 @@ export default function LandingPage() {
 
             <div className="pricing-grid">
               <div className="price-card">
-                <div className="price-tier">Starter</div>
-                <div className="price-name">Organização Básica</div>
-                <div className="price-amount"><span className="num">R$ 147</span><span className="period">/mês</span></div>
+                <div className="price-tier">Mensal</div>
+                <div className="price-name">Plano Mensal</div>
+                <div className="price-amount"><span className="num">R$ 119</span><span className="period">/mês</span></div>
                 <ul className="price-features">
-                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> 1 Número Conectado</li>
-                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> 1.000 Mensagens/mês</li>
-                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Inbox Compartilhado</li>
-                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Agenda Simples</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Acesso completo à Visuno</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Sem fidelidade</li>
                 </ul>
-                <Link href="/signup" className="btn btn-ghost">Assinar Starter</Link>
+                <Link href="/signup" className="btn btn-ghost">Assinar Mensal</Link>
               </div>
 
               <div className="price-card popular">
                 <div className="popular-badge">Mais Popular</div>
-                <div className="price-tier">Growth</div>
-                <div className="price-name">Plataforma de Vendas</div>
-                <div className="price-amount"><span className="num">R$ 237</span><span className="period">/mês</span></div>
+                <div className="price-tier">Semestral</div>
+                <div className="price-name">Plano Semestral</div>
+                <div className="price-amount"><span className="num">R$ 99</span><span className="period">/mês</span></div>
                 <ul className="price-features">
-                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> 3 Números Conectados</li>
-                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Mensagens Ilimitadas</li>
-                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Pipeline (Funil)</li>
-                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Dashboard Comercial</li>
-                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> IA de Análise</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Acesso completo à Visuno</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Cobrança de R$ 594 a cada 6 meses</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Economia de R$ 120</li>
                 </ul>
-                <Link href="/signup" className="btn btn-primary">Assinar Growth</Link>
+                <Link href="/signup" className="btn btn-primary">Assinar Semestral</Link>
               </div>
 
               <div className="price-card">
-                <div className="price-tier">Pro</div>
-                <div className="price-name">Automação Total</div>
-                <div className="price-amount"><span className="num">R$ 397</span><span className="period">/mês</span></div>
+                <div className="price-tier">Anual</div>
+                <div className="price-name">Plano Anual</div>
+                <div className="price-amount"><span className="num">R$ 89</span><span className="period">/mês</span></div>
                 <ul className="price-features">
-                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Números Ilimitados</li>
-                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Equipe Ilimitada</li>
-                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Robôs Avançados 24/7</li>
-                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Disparos em Massa</li>
-                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Suporte VIP</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Acesso completo à Visuno</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Cobrança de R$ 1.068 por ano</li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg> Economia de R$ 360</li>
                 </ul>
-                <Link href="/signup" className="btn btn-ghost">Assinar Pro</Link>
+                <Link href="/signup" className="btn btn-ghost">Assinar Anual</Link>
               </div>
             </div>
           </div>
