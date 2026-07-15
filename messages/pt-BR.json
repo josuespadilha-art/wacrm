@@ -1180,6 +1180,10 @@
           "label": "Etiquetar contato",
           "blurb": "Adiciona ou remove uma etiqueta de contato"
         },
+        "search_products": {
+          "label": "Consultar Produto",
+          "blurb": "Busca produtos no catálogo usando uma variável"
+        },
         "handoff": {
           "label": "Entregar para agente",
           "blurb": "Entrega a conversa para um humano"

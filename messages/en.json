@@ -1180,6 +1180,10 @@
           "label": "Tag contact",
           "blurb": "Adds or removes a contact tag"
         },
+        "search_products": {
+          "label": "Search products",
+          "blurb": "Searches for products based on a variable"
+        },
         "handoff": {
           "label": "Handoff to agent",
           "blurb": "Hands the conversation to a human"

@@ -233,6 +233,7 @@ const NODE_HUE: Record<NodeType, { l: number; c: number; h: number }> = {
   collect_input: { l: 0.65, c: 0.1, h: 185 }, // teal — capture
   condition: { l: 0.72, c: 0.15, h: 65 }, // amber — a fork in the road
   set_tag: { l: 0.65, c: 0.15, h: 350 }, // pink
+  search_products: { l: 0.75, c: 0.16, h: 80 }, // amber/yellow
   handoff: { l: 0.65, c: 0.17, h: 16 }, // rose — hands off
   appointment: { l: 0.55, c: 0.18, h: 10 }, // red/rose - agenda
   change_pipeline_stage: { l: 0.65, c: 0.18, h: 60 }, // amber/orange - crm
