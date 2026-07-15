@@ -463,10 +463,11 @@ export function summarizeNode(
       return note.length > 0 ? truncate(note) : null;
     }
     case 'search_products': {
-      const searchTermVar = typeof cfg.search_term_variable === 'string' ? cfg.search_term_variable : '';
+      const searchTerm = typeof cfg.search_term === 'string' ? cfg.search_term : 
+                         typeof cfg.search_term_variable === 'string' ? cfg.search_term_variable : '';
       const outputVar = typeof cfg.output_variable === 'string' ? cfg.output_variable : '';
-      if (searchTermVar) {
-        return `vars.${searchTermVar} → vars.${outputVar || '...'}`;
+      if (searchTerm) {
+        return `${truncate(searchTerm, 30)} → vars.${outputVar || '...'}`;
       }
       return null;
     }

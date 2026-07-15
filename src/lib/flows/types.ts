@@ -176,7 +176,8 @@ export interface SetTagNodeConfig {
 
 export interface SearchProductsNodeConfig {
   /** The var_key containing the search term */
-  search_term_variable: string;
+  search_term_variable?: string;
+  search_term?: string;
   /** The var_key to store the formatted search results */
   output_variable: string;
   /** Node to advance to after search */

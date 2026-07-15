@@ -870,8 +870,14 @@ async function advanceFromNodeKey(
     if (node.node_type === "search_products") {
       const cfg = node.config as unknown as SearchProductsNodeConfig;
       try {
-        const searchTerm = (run.vars[cfg.search_term_variable] as string) || "";
+        let searchTerm = "";
+        if (cfg.search_term) {
+          searchTerm = interpolateVars(cfg.search_term, run.vars);
+        } else if (cfg.search_term_variable) {
+          searchTerm = (run.vars[cfg.search_term_variable] as string) || "";
+        }
         
+
         const { data: products, error } = await db
           .from("products")
           .select("name, price")

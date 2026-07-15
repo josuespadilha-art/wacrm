@@ -205,14 +205,13 @@ export function NodeConfigForm({
       return (
         <>
           <div className="mb-4">
-            <label className="mb-1 block text-xs text-muted-foreground">Variável de Busca</label>
-            <Input
-              value={(cfg as any).search_term_variable ?? ""}
-              onChange={(e) => onUpdateConfig({ search_term_variable: e.target.value.replace(/[^a-zA-Z0-9_.]/g, "") })}
-              placeholder="Ex: produto"
-              className="bg-muted font-mono text-xs"
+            <TextRow
+              label="Termo de Busca"
+              value={(cfg as any).search_term ?? (cfg as any).search_term_variable ?? ""}
+              onChange={(v) => onUpdateConfig({ search_term: v })}
+              availableVars={["vars.produto", "vars.sua_chave"]}
             />
-            <p className="mt-1 text-[10px] text-muted-foreground">Nome da variável preenchida anteriormente pelo cliente.</p>
+            <p className="mt-1 text-[10px] text-muted-foreground">Ex: produto (Use o menu de Variáveis para usar algo que o cliente preencheu antes).</p>
           </div>
           <div className="mb-4">
             <label className="mb-1 block text-xs text-muted-foreground">Salvar Resultado Em</label>

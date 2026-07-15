@@ -184,7 +184,7 @@ export function defaultConfigFor(type: NodeType): Record<string, unknown> {
     case "set_tag":
       return { mode: "add", tag_id: "", next_node_key: "" };
     case "search_products":
-      return { search_term_variable: "", output_variable: "", next_node_key: "" };
+      return { search_term: "", output_variable: "", next_node_key: "" };
     case "handoff":
       return { note: "" };
     case "appointment":
