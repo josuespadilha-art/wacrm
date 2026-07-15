@@ -769,10 +769,12 @@ function validateNode(
     case "search_products": {
       const cfg = node.config as {
         search_term_variable?: string;
+        search_term?: string;
         output_variable?: string;
         next_node_key?: string;
       };
-      if (!cfg.search_term_variable?.trim()) {
+      const term = cfg.search_term ?? cfg.search_term_variable;
+      if (!term?.trim()) {
         issues.push({
           severity: "error",
           scope: "node",
