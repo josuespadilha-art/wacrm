@@ -138,9 +138,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const dryRun =
-      process.env.WHATSAPP_TEMPLATES_DRY_RUN === 'true' ||
-      process.env.WHATSAPP_TEMPLATES_DRY_RUN === '1'
+    const dryRun = true // Forçado para gravação do vídeo de aprovação da Meta
 
     let metaTemplateId: string
     let metaStatus: string
