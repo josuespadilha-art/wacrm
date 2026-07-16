@@ -65,7 +65,7 @@ export function FacebookLoginButton() {
         }
       },
       {
-        config_id: 'SEU_CONFIG_ID_AQUI', // A ser preenchido após a aprovação da Meta
+        config_id: '1834552510859132', // Configuração do Cadastro Incorporado Visuno
         scope: 'whatsapp_business_management,whatsapp_business_messaging',
         extras: {
           feature: 'whatsapp_embedded_signup'
