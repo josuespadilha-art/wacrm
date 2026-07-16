@@ -30,6 +30,7 @@ import {
   AccordionContent,
 } from '@/components/ui/accordion';
 import type { WhatsAppConfig as WhatsAppConfigType } from '@/types';
+import { FacebookLoginButton } from './facebook-login-button';
 
 const MASKED_TOKEN = '••••••••••••••••';
 
@@ -553,6 +554,23 @@ export function WhatsAppConfig() {
             )}
           </Alert>
         )}
+
+        {/* Embedded Signup */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-foreground flex items-center gap-2">
+              <Zap className="size-5 text-primary" />
+              Conexão Automática
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              Conecte sua conta do WhatsApp Business de forma automática através do Facebook. 
+              Recomendado para novos clientes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FacebookLoginButton />
+          </CardContent>
+        </Card>
 
         {/* API Credentials */}
         <Card>
