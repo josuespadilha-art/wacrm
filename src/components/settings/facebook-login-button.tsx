@@ -67,9 +67,11 @@ export function FacebookLoginButton() {
       {
         config_id: '1834552510859132', // Configuração do Cadastro Incorporado Visuno
         response_type: 'code',
+        override_default_response_type: true,
         scope: 'whatsapp_business_management,whatsapp_business_messaging',
         extras: {
-          feature: 'whatsapp_embedded_signup'
+          feature: 'whatsapp_embedded_signup',
+          sessionInfoVersion: '3'
         }
       }
     );
