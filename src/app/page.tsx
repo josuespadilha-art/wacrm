@@ -573,7 +573,7 @@ export default function LandingPage() {
 
         <nav className="nav" id="nav">
           <div className="nav-inner">
-            <a href="#top" className="brand"><span className="dot"></span>Visuno</a>
+            <a href="#top" className="brand"><img src="/logo-horizontal.png" alt="Visuno" style={{ height: '28px', objectFit: 'contain' }} /></a>
             <ul className="nav-links">
               <li><a href="#produto">Produto</a></li>
               <li><a href="#calculadora">Calculadora</a></li>
@@ -593,7 +593,7 @@ export default function LandingPage() {
 
         <div className={`mobile-menu ${mobileMenuOpen ? 'open' : ''}`} id="mobileMenu">
           <div className="mobile-menu-top">
-            <span className="brand">Visuno</span>
+            <span className="brand"><img src="/logo-horizontal.png" alt="Visuno" style={{ height: '28px', objectFit: 'contain' }} /></span>
             <button className="close-btn" id="closeBtn" onClick={() => setMobileMenuOpen(false)}>&times;</button>
           </div>
           <a href="#produto" onClick={() => setMobileMenuOpen(false)}>Produto</a>
@@ -989,7 +989,7 @@ export default function LandingPage() {
         {/* FOOTER */}
         <footer>
           <div className="wrap foot-inner">
-            <div className="foot-brand"><span className="brand"><span className="dot"></span>Visuno</span></div>
+            <div className="foot-brand"><span className="brand"><img src="/logo-horizontal.png" alt="Visuno" style={{ height: '28px', objectFit: 'contain' }} /></span></div>
             <p>© {new Date().getFullYear()} Visuno. Todos os direitos reservados.</p>
           </div>
         </footer>
